@@ -55,6 +55,26 @@ services:
       - internal
     restart: unless-stopped
 
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: deshahed-cloudflared
+    # Token-based "remote" tunnel — ingress (Public Hostnames) is configured in
+    # the Cloudflare dashboard, not in a local YAML. Cloudflared joins our internal
+    # network so Public Hostnames can target `http://web:3000` and `http://api:8000`
+    # via Docker DNS without exposing any host ports.
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_started
+    networks:
+      - internal
+    restart: unless-stopped
+    profiles: ["with-tunnel"]
+
   parser:
     build:
       context: ../services/parser
