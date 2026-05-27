@@ -54,6 +54,27 @@ services:
       - internal
     restart: unless-stopped
 
+  parser:
+    build:
+      context: ../services/parser
+    image: deshahed-parser:dev
+    container_name: deshahed-parser
+    environment:
+      APP_ENV: ${APP_ENV:-dev}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-deshahed}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-deshahed}
+      REDIS_URL: redis://redis:6379/0
+      # Compose interpolates env vars at parse time for the whole file, so a hard
+      # `:?` failure here would break unrelated services. Default to empty and let
+      # the poller refuse to start with a clear message (see alerts_poller.py).
+      ALERTS_API_TOKEN: ${ALERTS_API_TOKEN:-}
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - internal
+    restart: unless-stopped
+    profiles: ["with-poller"]
+
   web:
     build:
       context: ../apps/web
