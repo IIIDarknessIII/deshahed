@@ -73,15 +73,23 @@ async def get_active_alerts() -> ActiveAlertsResponse:
 
 @router.get("/alerts/history", response_model=HistoryResponse)
 async def get_alerts_history(
-    location_uid: int = Query(..., description="alerts.in.ua location_uid"),
+    location_uid: int | None = Query(None, description="alerts.in.ua location_uid (precise sub-region)"),
+    oblast: str | None = Query(None, description="Oblast full title — rolls up every sub-region inside it"),
     period: Period = Query("week"),
 ) -> HistoryResponse:
+    if location_uid is None and not oblast:
+        raise HTTPException(status_code=400, detail="provide location_uid or oblast")
+
     start = _period_start(period)
     now = datetime.now(timezone.utc)
 
     factory = get_session_factory()
     async with factory() as session:
-        stmt = select(AlertEvent).where(AlertEvent.location_uid == location_uid)
+        stmt = select(AlertEvent)
+        if oblast is not None:
+            stmt = stmt.where(AlertEvent.location_oblast == oblast)
+        if location_uid is not None:
+            stmt = stmt.where(AlertEvent.location_uid == location_uid)
         if start is not None:
             stmt = stmt.where(AlertEvent.started_at >= start)
         stmt = stmt.order_by(AlertEvent.started_at.desc())
@@ -101,7 +109,11 @@ async def get_alerts_history(
         )
         for r in rows
     ]
-    return HistoryResponse(location_uid=location_uid, period=period, items=items)
+    return HistoryResponse(
+        location_uid=location_uid if location_uid is not None else 0,
+        period=period,
+        items=items,
+    )
 
 
 @router.get("/stats/summary", response_model=SummaryResponse)
@@ -114,26 +126,30 @@ async def get_stats_summary(period: Period = Query("week")) -> SummaryResponse:
         func.coalesce(AlertEvent.finished_at, func.now()) - AlertEvent.started_at,
     )
 
+    # Group by the PARENT oblast — sub-oblast alerts (~94% of feed) would
+    # otherwise drown out actual oblast-level rows in the top-10 widget.
     factory = get_session_factory()
     async with factory() as session:
         per_oblast_stmt = select(
-            AlertEvent.location_uid,
-            AlertEvent.location_title,
+            AlertEvent.location_oblast_uid.label("uid"),
+            AlertEvent.location_oblast.label("title"),
             func.count().label("cnt"),
             func.coalesce(func.sum(duration_expr), 0).label("dur_sec"),
         )
         if start is not None:
             per_oblast_stmt = per_oblast_stmt.where(AlertEvent.started_at >= start)
         per_oblast_stmt = (
-            per_oblast_stmt.group_by(AlertEvent.location_uid, AlertEvent.location_title)
+            per_oblast_stmt.group_by(
+                AlertEvent.location_oblast_uid, AlertEvent.location_oblast
+            )
             .order_by(func.sum(duration_expr).desc().nullslast())
         )
         rows = (await session.execute(per_oblast_stmt)).all()
 
     by_oblast = [
         OblastStat(
-            location_uid=r.location_uid,
-            location_title=r.location_title,
+            location_uid=int(r.uid),
+            location_title=r.title,
             count=int(r.cnt),
             duration_minutes=int((r.dur_sec or 0) // 60),
         )
