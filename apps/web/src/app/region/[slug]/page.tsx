@@ -33,8 +33,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       siteName: "deshahed",
       locale: "uk_UA",
       type: "website",
+      images: [{ url: "/og.png", width: 1200, height: 630, alt: title }],
     },
-    twitter: { card: "summary", title, description },
+    twitter: { card: "summary_large_image", title, description, images: ["/og.png"] },
   };
 }
 
@@ -72,8 +73,32 @@ export default async function RegionPage({ params }: Props) {
           </p>
         </section>
 
-        <RegionHistory regionUid={region.uid} regionTitle={region.title} />
+        <RegionHistory
+          regionUid={region.uid}
+          regionTitle={region.title}
+          oblastFullName={region.full_name_uk}
+        />
       </div>
+
+      <script
+        type="application/ld+json"
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            itemListElement: [
+              { "@type": "ListItem", position: 1, name: "Карта тривог", item: SITE },
+              {
+                "@type": "ListItem",
+                position: 2,
+                name: region.full_name_uk,
+                item: `${SITE}/region/${region.slug}`,
+              },
+            ],
+          }),
+        }}
+      />
     </main>
   );
 }
