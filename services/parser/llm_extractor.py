@@ -1,21 +1,17 @@
-"""LLM extractor — consumes raw TG messages from Redis Stream `messages_raw`,
-asks OpenRouter (OpenAI-compatible API) to turn each into structured events,
-geocodes every event's location/direction, writes drone_events rows, and
-publishes appearances on the `drones:updates` pub/sub channel.
+"""Message-to-event extractor with a 3-stage cascade:
 
-Flow per TZ section 2.5:
-  1. xreadgroup messages_raw with consumer group "llm-extractor"
-  2. hash(text) → if cached structured JSON in Redis, skip LLM
-  3. else POST to OpenRouter with strict JSON response_format
-  4. validate against LLMResponse pydantic schema; retry once on parse fail,
-     then push to messages_dlq stream + ack
-  5. for each LLMEvent: geocoder.resolve(location), geocoder.resolve(direction);
-     skip if location couldn't be resolved
-  6. INSERT into drone_events (ON CONFLICT DO NOTHING by source_channel +
-     source_message_id) → expires_at = detected_at + 15min
-  7. publish DroneAppearedMessage to drones:updates
+  [1] local_extractor    pymorphy3 lemmas + Aho-Corasick gazetteer
+                         covers ~70-85% of straightforward TG phrases
+                         for free, in milliseconds, no network call.
+  [2] OpenRouter FREE    catches what the heuristic punts on, using a
+                         no-cost model (default
+                         meta-llama/llama-3.2-3b-instruct:free).
+  [3] OpenRouter PAID    only kicks in when [2] errors / rate-limits.
 
-Refuses to start if OPENROUTER_API_KEY is empty.
+Common downstream: geocoder.resolve() → drone_events row → publish
+DroneAppearedMessage on `drones:updates` for the WS broadcaster.
+
+Refuses to start if OPENROUTER_API_KEY is empty (both tiers go through it).
 """
 from __future__ import annotations
 
@@ -26,6 +22,8 @@ import logging
 import os
 import signal
 from datetime import datetime, timedelta, timezone
+
+import time
 
 import httpx
 from geoalchemy2.shape import from_shape
@@ -38,6 +36,11 @@ from app.db import dispose, get_redis, get_session_factory
 from app.geocoder import resolve as geocode_resolve
 from app.models import DroneEvent
 from app.schemas.drones import DroneAppearedMessage, DroneEventView, LLMEvent, LLMResponse
+
+import pymorphy3
+
+from .gazetteer import load_gazetteer
+from .local_extractor import LocalExtraction, LocalExtractor
 
 log = logging.getLogger("llm_extractor")
 
@@ -52,7 +55,11 @@ CACHE_TTL_SEC = 24 * 3600
 TTL_MIN = 15
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-DEFAULT_MODEL = "openai/gpt-4o-mini"
+DEFAULT_FREE_MODEL = "meta-llama/llama-3.2-3b-instruct:free"
+DEFAULT_PAID_MODEL = "openai/gpt-4o-mini"
+
+# Counters reported once a minute so the cascade savings are observable.
+_stats = {"local": 0, "free": 0, "paid": 0, "free_failed": 0, "paid_failed": 0}
 
 SYSTEM_PROMPT = """\
 Ти парсер повідомлень про повітряні загрози в Україні.
@@ -111,21 +118,53 @@ async def _call_llm(client: AsyncOpenAI, model: str, text: str) -> LLMResponse:
     return LLMResponse.model_validate(data)
 
 
+async def _try_llm_with_retry(
+    client: AsyncOpenAI, model: str, text: str
+) -> LLMResponse:
+    try:
+        return await _call_llm(client, model, text)
+    except (json.JSONDecodeError, ValidationError):
+        log.warning("LLM %s returned invalid JSON; retrying once", model)
+        return await _call_llm(client, model, text)
+
+
 async def _extract_with_cache(
-    client: AsyncOpenAI, model: str, text: str, redis
+    client: AsyncOpenAI,
+    free_model: str,
+    paid_model: str,
+    text: str,
+    redis,
+    local: LocalExtractor,
 ) -> LLMResponse:
     h = _hash_text(text)
     cached = await redis.get(CACHE_PREFIX + h)
     if cached:
         return LLMResponse.model_validate_json(cached)
 
-    try:
-        result = await _call_llm(client, model, text)
-    except (json.JSONDecodeError, ValidationError):
-        # one retry
-        log.warning("LLM returned invalid JSON; retrying once")
-        result = await _call_llm(client, model, text)
+    # Tier 1: local
+    local_result: LocalExtraction = local.extract(text)
+    if local_result.confident:
+        _stats["local"] += 1
+        log.debug("local hit (%s): %d event(s)", local_result.reason, len(local_result.events))
+        result = LLMResponse(events=local_result.events)
+        await redis.set(CACHE_PREFIX + h, result.model_dump_json(), ex=CACHE_TTL_SEC)
+        return result
 
+    # Tier 2: free LLM
+    try:
+        result = await _try_llm_with_retry(client, free_model, text)
+        _stats["free"] += 1
+        log.debug("free LLM (%s) used: %d event(s)", free_model, len(result.events))
+        await redis.set(CACHE_PREFIX + h, result.model_dump_json(), ex=CACHE_TTL_SEC)
+        return result
+    except Exception as e:
+        _stats["free_failed"] += 1
+        log.warning("free LLM %s failed: %s", free_model, str(e)[:200])
+
+    # Tier 3: paid LLM
+    result = await _try_llm_with_retry(client, paid_model, text)
+    _stats["paid"] += 1
+    log.debug("paid LLM (%s) used: %d event(s)", paid_model, len(result.events))
     await redis.set(CACHE_PREFIX + h, result.model_dump_json(), ex=CACHE_TTL_SEC)
     return result
 
@@ -215,8 +254,10 @@ async def _handle_message(
     fields: dict,
     *,
     client: AsyncOpenAI,
-    model: str,
+    free_model: str,
+    paid_model: str,
     redis,
+    local: LocalExtractor,
 ) -> bool:
     """Returns True on successful processing (incl. empty events), False to DLQ."""
     raw = fields.get("data") or fields.get(b"data")
@@ -243,9 +284,12 @@ async def _handle_message(
     )
 
     try:
-        extracted = await _extract_with_cache(client, model, text, redis)
+        extracted = await _extract_with_cache(
+            client, free_model, paid_model, text, redis, local
+        )
     except Exception:
-        log.exception("LLM extraction failed twice for msg=%s", msg_id)
+        _stats["paid_failed"] += 1
+        log.exception("extraction failed (local + free + paid) for msg=%s", msg_id)
         return False
 
     if not extracted.events:
@@ -274,8 +318,15 @@ async def _run(stop: asyncio.Event) -> None:
         log.error("OPENROUTER_API_KEY is not set; refusing to start")
         raise SystemExit(2)
 
-    model = os.environ.get("OPENROUTER_MODEL", DEFAULT_MODEL)
-    log.info("llm_extractor starting; model=%s", model)
+    # OPENROUTER_MODEL stays as the legacy alias for OPENROUTER_PAID_MODEL,
+    # so users that set just the one-tier var keep working.
+    free_model = os.environ.get("OPENROUTER_FREE_MODEL", DEFAULT_FREE_MODEL).strip()
+    paid_model = (
+        os.environ.get("OPENROUTER_PAID_MODEL")
+        or os.environ.get("OPENROUTER_MODEL")
+        or DEFAULT_PAID_MODEL
+    ).strip()
+    log.info("llm_extractor starting; free=%s paid=%s", free_model, paid_model)
 
     client = AsyncOpenAI(
         base_url=OPENROUTER_BASE_URL,
@@ -291,6 +342,17 @@ async def _run(stop: asyncio.Event) -> None:
     await _ensure_group(redis)
     consumer_name = f"worker-{os.getpid()}"
 
+    # One MorphAnalyzer instance, shared with the gazetteer for form expansion
+    # and with the extractor at runtime for type-keyword lemmatization.
+    morph = pymorphy3.MorphAnalyzer(lang="uk")
+    factory = get_session_factory()
+    async with factory() as session:
+        gazetteer = await load_gazetteer(session, morph)
+    local = LocalExtractor(gazetteer, morph)
+    log.info("local extractor ready")
+
+    last_stat_at = time.monotonic()
+
     while not stop.is_set():
         try:
             entries = await redis.xreadgroup(
@@ -304,13 +366,21 @@ async def _run(stop: asyncio.Event) -> None:
             log.exception("xreadgroup failed; sleeping")
             await asyncio.wait_for(stop.wait(), timeout=2.0)
             continue
+
+        # periodic cascade-usage stat
+        if time.monotonic() - last_stat_at > 60:
+            log.info("cascade stats: %s", _stats)
+            last_stat_at = time.monotonic()
+
         if not entries:
             continue
 
         for _, msgs in entries:
             for msg_id, fields in msgs:
                 ok = await _handle_message(
-                    msg_id, fields, client=client, model=model, redis=redis
+                    msg_id, fields,
+                    client=client, free_model=free_model, paid_model=paid_model,
+                    redis=redis, local=local,
                 )
                 if ok:
                     await redis.xack(STREAM_RAW, CONSUMER_GROUP, msg_id)

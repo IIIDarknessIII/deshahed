@@ -130,7 +130,8 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-deshahed}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-deshahed}
       REDIS_URL: redis://redis:6379/0
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-openai/gpt-4o-mini}
+      OPENROUTER_FREE_MODEL: ${OPENROUTER_FREE_MODEL:-meta-llama/llama-3.2-3b-instruct:free}
+      OPENROUTER_PAID_MODEL: ${OPENROUTER_PAID_MODEL:-openai/gpt-4o-mini}
     depends_on:
       api:
         condition: service_healthy

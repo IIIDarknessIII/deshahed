@@ -12,3 +12,7 @@ geoalchemy2==0.16.0
 shapely==2.0.6
 openai==1.57.0
 telethon==1.38.1
+pymorphy3==2.0.4
+pymorphy3-dicts-uk==2.4.1.1.1663094765
+pyahocorasick==2.1.0
+rapidfuzz==3.10.1
