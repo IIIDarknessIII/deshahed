@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import maplibregl, { type Map as MapLibreMap } from "maplibre-gl";
-import { useAlertsStore, selectOblastStateMap } from "@/stores/alertsStore";
+import { useAlertsStore, selectOblastAggregate } from "@/stores/alertsStore";
 import { useDronesStore } from "@/stores/dronesStore";
 import { useTracksStore } from "@/stores/tracksStore";
 import { useUiStore } from "@/stores/uiStore";
@@ -163,6 +163,7 @@ export function Map() {
             "artillery_shelling", "#f97316",
             "air_raid_drone", "#b91c1c",
             "air_raid", "#ef4444",
+            "potential", "#eab308",
             "#1f2937",
           ],
           "fill-opacity": [
@@ -172,6 +173,7 @@ export function Map() {
             "artillery_shelling", 0.5,
             "air_raid_drone", 0.5,
             "air_raid", 0.45,
+            "potential", 0.28,
             0.55,
           ],
         },
@@ -369,35 +371,55 @@ export function Map() {
         artillery_shelling: { label: "Загроза артобстрілу", color: "text-orange-300" },
         air_raid_drone: { label: "Ударні/імітаційні БпЛА", color: "text-red-300" },
         air_raid: { label: "Повітряна тривога", color: "text-red-400" },
+        potential: { label: "Потенційні загрози", color: "text-amber-300" },
       };
+
+      const escapeHtml = (s: string) =>
+        s.replace(/[&<>"']/g, (c) =>
+          ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!),
+        );
 
       map.on("mousemove", FILL_LAYER, (e) => {
         if (cancelled || !e.features || e.features.length === 0) return;
         map.getCanvas().style.cursor = "pointer";
         const f = e.features[0];
         const title = (f.properties as { full_name_uk?: string } | null)?.full_name_uk ?? "";
-        const states = selectOblastStateMap(useAlertsStore.getState());
-        const state = title ? states.get(title) : undefined;
+        const aggregates = selectOblastAggregate(useAlertsStore.getState());
+        const agg = title ? aggregates.get(title) : undefined;
+        const meta = agg ? STATE_LABELS[agg.state] : null;
+
         let durationLabel = "";
-        if (state) {
+        if (agg && agg.oblast_level) {
           for (const a of useAlertsStore.getState().alerts.values()) {
-            if ((a.location_oblast || a.location_title) === title) {
+            if ((a.location_oblast || a.location_title) === title
+              && (a.location_type === "oblast" || a.location_type === "autonomous_republic")) {
               const ms = Date.now() - +new Date(a.started_at);
               const min = Math.max(0, Math.floor(ms / 60_000));
-              durationLabel = min > 0 ? `${min} хв` : "щойно";
+              durationLabel = min > 0 ? ` · ${min} хв` : " · щойно";
               break;
             }
           }
         }
-        const meta = state ? STATE_LABELS[state] : null;
+
+        const subListHtml = agg && agg.sub.length
+          ? `<ul class="mt-1.5 space-y-0.5 border-t border-zinc-700/60 pt-1.5 text-[11px] text-zinc-300">
+              ${agg.sub.slice(0, 6).map((s) => {
+                const subMeta = STATE_LABELS[s.state] ?? { label: s.alert_type, color: "text-zinc-400" };
+                return `<li class="${subMeta.color}">${escapeHtml(s.title)} <span class="text-zinc-500">— ${subMeta.label}</span></li>`;
+              }).join("")}
+              ${agg.sub.length > 6 ? `<li class="text-zinc-500">…ще ${agg.sub.length - 6}</li>` : ""}
+            </ul>`
+          : "";
+
+        const headerHtml = meta
+          ? `<div class="mt-0.5 text-[11px] ${meta.color}">${meta.label}${durationLabel}</div>`
+          : `<div class="mt-0.5 text-[11px] text-zinc-500">Немає інформації про тривогу</div>`;
+
         const html = `
-          <div class="px-2 py-1.5">
-            <div class="text-[12px] font-medium text-zinc-100">${title}</div>
-            ${
-              meta
-                ? `<div class="mt-0.5 text-[11px] ${meta.color}">${meta.label} · ${durationLabel}</div>`
-                : `<div class="mt-0.5 text-[11px] text-zinc-500">Немає інформації про тривогу</div>`
-            }
+          <div class="px-2 py-1.5 max-w-[260px]">
+            <div class="text-[12px] font-medium text-zinc-100">${escapeHtml(title)}</div>
+            ${headerHtml}
+            ${subListHtml}
           </div>
         `;
         popup.setLngLat(e.lngLat).setHTML(html).addTo(map);
@@ -423,12 +445,13 @@ export function Map() {
     const applyAlertState = () => {
       const geo = geojsonRef.current;
       if (!geo || !mapRef.current) return;
-      const states = selectOblastStateMap(useAlertsStore.getState());
+      const aggregates = selectOblastAggregate(useAlertsStore.getState());
       const subscribed = readSubscribedOblast();
       let changed = false;
       for (const f of geo.features) {
         const title = (f.properties as { full_name_uk?: string } | null)?.full_name_uk;
-        const next = (title && states.get(title)) || "safe";
+        const agg = title ? aggregates.get(title) : undefined;
+        const next = agg?.state ?? "safe";
         const nextSubscribed = !!(title && subscribed && title === subscribed);
         const props = f.properties as { state?: string; subscribed?: boolean } | null;
         if (props?.state !== next || props?.subscribed !== nextSubscribed) {

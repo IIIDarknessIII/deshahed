@@ -1,5 +1,11 @@
 import { create } from "zustand";
-import type { AlertType, AlertView, OblastAlertState } from "@/lib/types";
+import type {
+  AlertType,
+  AlertView,
+  OblastAggregate,
+  OblastAlertState,
+  OblastSubAlert,
+} from "@/lib/types";
 
 type Key = string;
 
@@ -49,10 +55,11 @@ export function selectActiveTitles(state: AlertsState): Set<string> {
 // Severity ladder — higher index wins when an oblast has multiple alerts.
 const SEVERITY: Record<OblastAlertState, number> = {
   safe: 0,
-  air_raid: 1,
-  air_raid_drone: 2,
-  artillery_shelling: 3,
-  urban_fights: 4,
+  potential: 1,
+  air_raid: 2,
+  air_raid_drone: 3,
+  artillery_shelling: 4,
+  urban_fights: 5,
 };
 
 const DRONE_NOTES_RE = /бпла|дрон|шахед|shahed/i;
@@ -70,14 +77,48 @@ function classify(a: AlertView): OblastAlertState {
   }
 }
 
-/** Map of oblast title → worst-case alert state currently in effect. */
-export function selectOblastStateMap(state: AlertsState): Map<string, OblastAlertState> {
-  const out = new Map<string, OblastAlertState>();
+/** Per-oblast aggregate that splits oblast-level vs sub-region alerts.
+ *
+ *  Choropleth paints `state`:
+ *    - if any oblast-level alert is in effect → max severity of those
+ *    - else if any sub-region alert is in effect → "potential" (yellow)
+ *    - else → "safe"
+ *
+ *  This prevents one hromada's urban_fights from flooding the whole oblast
+ *  with the most severe colour — those still surface in the popup's
+ *  `sub` list, just not on the choropleth fill.
+ */
+export function selectOblastAggregate(state: AlertsState): Map<string, OblastAggregate> {
+  const out = new Map<string, OblastAggregate>();
   for (const a of state.alerts.values()) {
     const title = a.location_oblast || a.location_title;
-    const next = classify(a);
-    const prev = out.get(title);
-    if (!prev || SEVERITY[next] > SEVERITY[prev]) out.set(title, next);
+    const isOblast = a.location_type === "oblast" || a.location_type === "autonomous_republic";
+    const cls = classify(a);
+    let agg = out.get(title);
+    if (!agg) {
+      agg = { state: "safe", oblast_level: false, sub: [] };
+      out.set(title, agg);
+    }
+    if (isOblast) {
+      if (!agg.oblast_level || SEVERITY[cls] > SEVERITY[agg.state]) {
+        agg.state = cls;
+        agg.oblast_level = true;
+      }
+    } else {
+      // sub-region; record details for popup, escalate map only to "potential"
+      // when nothing oblast-level outranks it.
+      const sub: OblastSubAlert = {
+        title: a.location_title,
+        state: cls,
+        alert_type: a.alert_type,
+        location_type: a.location_type,
+        started_at: a.started_at,
+      };
+      agg.sub.push(sub);
+      if (!agg.oblast_level && agg.state === "safe") {
+        agg.state = "potential";
+      }
+    }
   }
   return out;
 }

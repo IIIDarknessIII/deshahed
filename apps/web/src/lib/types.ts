@@ -34,7 +34,25 @@ export type OblastAlertState =
   | "artillery_shelling"
   | "air_raid_drone"
   | "air_raid"
+  | "potential"   // sub-region alert only — oblast-level is clean
   | "safe";
+
+export interface OblastSubAlert {
+  title: string;       // e.g. "Вовчанська територіальна громада"
+  state: OblastAlertState;
+  alert_type: AlertType;
+  location_type: LocationType;
+  started_at: string;
+}
+
+export interface OblastAggregate {
+  /** Colour the choropleth paints on this oblast. */
+  state: OblastAlertState;
+  /** True if any oblast-level alert is in effect (vs only sub-region). */
+  oblast_level: boolean;
+  /** Sub-oblast alerts in effect — for the hover popup breakdown. */
+  sub: OblastSubAlert[];
+}
 
 export type WsMessage =
   | { type: "snapshot"; alerts: AlertView[] }
