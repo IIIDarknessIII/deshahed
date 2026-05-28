@@ -24,6 +24,7 @@ import json
 import logging
 import os
 import signal
+import uuid
 from datetime import datetime, timedelta, timezone
 
 import time
@@ -33,6 +34,7 @@ from geoalchemy2.shape import from_shape
 from openai import AsyncOpenAI
 from pydantic import ValidationError
 from shapely.geometry import Point
+from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.db import dispose, get_redis, get_session_factory
@@ -56,6 +58,11 @@ CACHE_PREFIX = "llm:cache:"
 CACHE_TTL_SEC = 24 * 3600
 
 TTL_MIN = 15
+
+# Phase 3 dedup window — per TZ section 3.1, two reports of the same event_type
+# within these bounds are the same physical drone, merged into one cluster.
+DEDUP_TIME_WINDOW_MIN = 3
+DEDUP_DISTANCE_M = 30_000
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 DEFAULT_PAID_MODEL = "openai/gpt-4o-mini"
@@ -225,6 +232,24 @@ async def _extract_with_cache(
     return result
 
 
+DEDUP_QUERY = text(
+    """
+    SELECT id, cluster_id
+    FROM drone_events
+    WHERE event_type = :event_type
+      AND detected_at > :since
+      AND ST_DWithin(location_point, ST_MakePoint(:lon, :lat)::geography, :distance_m)
+      AND NOT EXISTS (
+        SELECT 1 FROM jsonb_array_elements(sources) s
+        WHERE s->>'channel' = :source_channel
+          AND (s->>'message_id')::bigint = :source_message_id
+      )
+    ORDER BY detected_at DESC
+    LIMIT 1
+    """
+)
+
+
 async def _persist_and_publish(
     event: LLMEvent,
     *,
@@ -250,6 +275,45 @@ async def _persist_and_publish(
         if event.direction:
             direction = await geocode_resolve(event.direction, session)
 
+        new_source = {
+            "channel": source_channel,
+            "message_id": source_message_id,
+            "detected_at": detected_at.isoformat(),
+        }
+
+        # Phase 3 dedup: same event_type within 30km + 3min and this exact
+        # (channel, message_id) not already credited → merge as a new source.
+        candidate = (await session.execute(
+            DEDUP_QUERY,
+            {
+                "event_type": event.type,
+                "since": detected_at - timedelta(minutes=DEDUP_TIME_WINDOW_MIN),
+                "lon": loc.lon,
+                "lat": loc.lat,
+                "distance_m": DEDUP_DISTANCE_M,
+                "source_channel": source_channel,
+                "source_message_id": source_message_id,
+            },
+        )).first()
+
+        if candidate is not None:
+            await session.execute(
+                text(
+                    "UPDATE drone_events SET sources = sources || cast(:addition AS jsonb) "
+                    "WHERE id = :id"
+                ),
+                {"id": candidate.id, "addition": json.dumps([new_source])},
+            )
+            await session.commit()
+            log.info(
+                "dedup: merged into event #%s (cluster=%s) — now has +1 source",
+                candidate.id, candidate.cluster_id,
+            )
+            # Don't publish — the cluster is already on the map; the merge is
+            # just an enrichment of provenance, not a new appearance.
+            return
+
+        # Else: brand-new cluster.
         expires_at = detected_at + timedelta(minutes=TTL_MIN)
         loc_point = from_shape(Point(loc.lon, loc.lat), srid=4326)
         dir_point = (
@@ -257,6 +321,7 @@ async def _persist_and_publish(
             if direction and direction.found
             else None
         )
+        cluster_id = uuid.uuid4()
 
         stmt = (
             pg_insert(DroneEvent)
@@ -273,6 +338,8 @@ async def _persist_and_publish(
                 raw_payload=raw_payload,
                 detected_at=detected_at,
                 expires_at=expires_at,
+                cluster_id=cluster_id,
+                sources=[new_source],
             )
             .on_conflict_do_nothing(
                 index_elements=["source_channel", "source_message_id"]
@@ -284,7 +351,8 @@ async def _persist_and_publish(
         await session.commit()
 
         if new_id is None:
-            # Conflict: this exact (channel, message_id) already produced an event — skip.
+            # Conflict: same (channel, message_id) just inserted by another
+            # worker / retry — idempotent no-op.
             return
 
         view = DroneEventView(
