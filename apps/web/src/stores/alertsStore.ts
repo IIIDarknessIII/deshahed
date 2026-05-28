@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { AlertType, AlertView } from "@/lib/types";
+import type { AlertType, AlertView, OblastAlertState } from "@/lib/types";
 
 type Key = string;
 
@@ -44,6 +44,42 @@ export function selectActiveTitles(state: AlertsState): Set<string> {
   const set = new Set<string>();
   for (const a of state.alerts.values()) set.add(a.location_oblast || a.location_title);
   return set;
+}
+
+// Severity ladder — higher index wins when an oblast has multiple alerts.
+const SEVERITY: Record<OblastAlertState, number> = {
+  safe: 0,
+  air_raid: 1,
+  air_raid_drone: 2,
+  artillery_shelling: 3,
+  urban_fights: 4,
+};
+
+const DRONE_NOTES_RE = /бпла|дрон|шахед|shahed/i;
+
+function classify(a: AlertView): OblastAlertState {
+  switch (a.alert_type) {
+    case "urban_fights":
+      return "urban_fights";
+    case "artillery_shelling":
+      return "artillery_shelling";
+    case "air_raid":
+      return a.notes && DRONE_NOTES_RE.test(a.notes) ? "air_raid_drone" : "air_raid";
+    default:
+      return "air_raid";
+  }
+}
+
+/** Map of oblast title → worst-case alert state currently in effect. */
+export function selectOblastStateMap(state: AlertsState): Map<string, OblastAlertState> {
+  const out = new Map<string, OblastAlertState>();
+  for (const a of state.alerts.values()) {
+    const title = a.location_oblast || a.location_title;
+    const next = classify(a);
+    const prev = out.get(title);
+    if (!prev || SEVERITY[next] > SEVERITY[prev]) out.set(title, next);
+  }
+  return out;
 }
 
 export function selectAlertsList(state: AlertsState): AlertView[] {

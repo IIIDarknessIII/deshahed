@@ -6,6 +6,7 @@ import { useStatsSummary } from "@/hooks/useStats";
 import { useUiStore, type HeatmapPeriod } from "@/stores/uiStore";
 import { formatDuration } from "@/lib/format";
 import { PushSubscribe } from "@/components/PushSubscribe";
+import { AlertLegend } from "@/components/AlertLegend";
 
 const HEATMAP_PERIODS: { value: HeatmapPeriod; label: string }[] = [
   { value: "day", label: "Доба" },
@@ -84,6 +85,10 @@ export function StatsPanel() {
 
       <div className="border-t border-border px-4 py-3">
         <PushSubscribe />
+      </div>
+
+      <div className="border-t border-border px-4 py-3">
+        <AlertLegend />
       </div>
 
       <div className="border-t border-border px-4 py-3">

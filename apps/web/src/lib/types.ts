@@ -24,7 +24,17 @@ export interface AlertView {
    *  For oblast-level alerts mirrors location_title. */
   location_oblast: string;
   location_oblast_uid: number;
+  /** Free-text from alerts.in.ua. When it mentions БпЛА / дрон the UI
+   *  escalates the cell to the shahed tier. */
+  notes?: string | null;
 }
+
+export type OblastAlertState =
+  | "urban_fights"
+  | "artillery_shelling"
+  | "air_raid_drone"
+  | "air_raid"
+  | "safe";
 
 export type WsMessage =
   | { type: "snapshot"; alerts: AlertView[] }

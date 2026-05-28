@@ -62,6 +62,7 @@ def _normalize(a: dict) -> dict:
         "location_oblast_uid": int(a["location_oblast_uid"])
             if a.get("location_oblast_uid") is not None
             else int(a["location_uid"]),
+        "notes": a.get("notes") or None,
     }
 
 

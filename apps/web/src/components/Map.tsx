@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import maplibregl, { type Map as MapLibreMap } from "maplibre-gl";
-import { useAlertsStore, selectActiveTitles } from "@/stores/alertsStore";
+import { useAlertsStore, selectOblastStateMap } from "@/stores/alertsStore";
 import { useDronesStore } from "@/stores/dronesStore";
 import { useTracksStore } from "@/stores/tracksStore";
 import { useUiStore } from "@/stores/uiStore";
@@ -25,6 +25,49 @@ const TRAJECTORIES_HEAD_LAYER = "trajectories-head";
 
 const HEATMAP_SOURCE = "heatmap";
 const HEATMAP_FILL_LAYER = "heatmap-fill";
+
+const PUSH_REGION_LS_KEY = "deshahed.pushRegion";
+const PUSH_REGION_EVENT = "deshahed:pushRegionChange";
+
+function readSubscribedOblast(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(PUSH_REGION_LS_KEY);
+}
+
+// Delta-wing silhouette mimicking a shahed-style UAV; a tinted dot marks
+// the warhead. We embed one variant per event_type to keep them colour-coded.
+function droneSvg(fill: string): string {
+  return `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+      <path d="M16 3 L28 25 L16 20 L4 25 Z"
+            fill="${fill}" stroke="#0a0a0b" stroke-width="1.5" stroke-linejoin="round"/>
+      <circle cx="16" cy="20" r="2.2" fill="#fde047" stroke="#0a0a0b" stroke-width="0.8"/>
+    </svg>`;
+}
+
+const DRONE_ICONS: Record<string, string> = {
+  "drone-shahed": droneSvg("#fb923c"),
+  "drone-missile": droneSvg("#dc2626"),
+  "drone-kab": droneSvg("#a855f7"),
+  "drone-aviation": droneSvg("#38bdf8"),
+};
+
+function svgToImage(svg: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image(32, 32);
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = "data:image/svg+xml;utf8," + encodeURIComponent(svg);
+  });
+}
+
+async function registerDroneIcons(map: MapLibreMap): Promise<void> {
+  for (const [name, svg] of Object.entries(DRONE_ICONS)) {
+    if (map.hasImage(name)) continue;
+    const img = await svgToImage(svg);
+    if (!map.hasImage(name)) map.addImage(name, img, { pixelRatio: 2 });
+  }
+}
 
 const STYLE: maplibregl.StyleSpecification = {
   version: 8,
@@ -112,19 +155,19 @@ export function Map() {
           "fill-color": [
             "match",
             ["get", "state"],
-            "active",
-            "#ef4444",
-            "recent",
-            "#f59e0b",
+            "urban_fights", "#a855f7",
+            "artillery_shelling", "#f97316",
+            "air_raid_drone", "#b91c1c",
+            "air_raid", "#ef4444",
             "#1f2937",
           ],
           "fill-opacity": [
             "match",
             ["get", "state"],
-            "active",
-            0.45,
-            "recent",
-            0.35,
+            "urban_fights", 0.55,
+            "artillery_shelling", 0.5,
+            "air_raid_drone", 0.5,
+            "air_raid", 0.45,
             0.55,
           ],
         },
@@ -135,8 +178,16 @@ export function Map() {
         type: "line",
         source: SOURCE_ID,
         paint: {
-          "line-color": "#27272a",
-          "line-width": 1,
+          "line-color": [
+            "case",
+            ["==", ["get", "subscribed"], true], "#38bdf8",
+            "#27272a",
+          ],
+          "line-width": [
+            "case",
+            ["==", ["get", "subscribed"], true], 2.2,
+            1,
+          ],
         },
       });
 
@@ -175,6 +226,8 @@ export function Map() {
         data: { type: "FeatureCollection", features: [] },
       });
 
+      await registerDroneIcons(map);
+
       map.addLayer({
         id: DRONE_TRACKS_LAYER,
         type: "line",
@@ -196,22 +249,21 @@ export function Map() {
       });
       map.addLayer({
         id: DRONES_POINT_LAYER,
-        type: "circle",
+        type: "symbol",
         source: DRONES_SOURCE,
-        paint: {
-          "circle-radius": 7,
-          "circle-color": [
+        layout: {
+          "icon-image": [
             "match",
             ["get", "event_type"],
-            "shahed", "#fb923c",
-            "missile", "#dc2626",
-            "kab", "#a855f7",
-            "aviation", "#38bdf8",
-            "#9ca3af",
+            "shahed", "drone-shahed",
+            "missile", "drone-missile",
+            "kab", "drone-kab",
+            "aviation", "drone-aviation",
+            "drone-shahed",
           ],
-          "circle-stroke-color": "#0a0a0b",
-          "circle-stroke-width": 1.5,
-          "circle-opacity": 0.95,
+          "icon-size": 0.55,
+          "icon-allow-overlap": true,
+          "icon-rotation-alignment": "map",
         },
       });
 
@@ -279,17 +331,24 @@ export function Map() {
         offset: 8,
       });
 
+      const STATE_LABELS: Record<string, { label: string; color: string }> = {
+        urban_fights: { label: "Загроза вуличних боїв", color: "text-purple-300" },
+        artillery_shelling: { label: "Загроза артобстрілу", color: "text-orange-300" },
+        air_raid_drone: { label: "Ударні/імітаційні БпЛА", color: "text-red-300" },
+        air_raid: { label: "Повітряна тривога", color: "text-red-400" },
+      };
+
       map.on("mousemove", FILL_LAYER, (e) => {
         if (cancelled || !e.features || e.features.length === 0) return;
         map.getCanvas().style.cursor = "pointer";
         const f = e.features[0];
         const title = (f.properties as { full_name_uk?: string } | null)?.full_name_uk ?? "";
-        const titles = selectActiveTitles(useAlertsStore.getState());
-        const isActive = title && titles.has(title);
+        const states = selectOblastStateMap(useAlertsStore.getState());
+        const state = title ? states.get(title) : undefined;
         let durationLabel = "";
-        if (isActive) {
+        if (state) {
           for (const a of useAlertsStore.getState().alerts.values()) {
-            if (a.location_title === title) {
+            if ((a.location_oblast || a.location_title) === title) {
               const ms = Date.now() - +new Date(a.started_at);
               const min = Math.max(0, Math.floor(ms / 60_000));
               durationLabel = min > 0 ? `${min} хв` : "щойно";
@@ -297,13 +356,14 @@ export function Map() {
             }
           }
         }
+        const meta = state ? STATE_LABELS[state] : null;
         const html = `
           <div class="px-2 py-1.5">
             <div class="text-[12px] font-medium text-zinc-100">${title}</div>
             ${
-              isActive
-                ? `<div class="mt-0.5 text-[11px] text-red-400">Тривога · ${durationLabel}</div>`
-                : `<div class="mt-0.5 text-[11px] text-zinc-500">Без тривоги</div>`
+              meta
+                ? `<div class="mt-0.5 text-[11px] ${meta.color}">${meta.label} · ${durationLabel}</div>`
+                : `<div class="mt-0.5 text-[11px] text-zinc-500">Немає інформації про тривогу</div>`
             }
           </div>
         `;
@@ -330,13 +390,17 @@ export function Map() {
     const applyAlertState = () => {
       const geo = geojsonRef.current;
       if (!geo || !mapRef.current) return;
-      const titles = selectActiveTitles(useAlertsStore.getState());
+      const states = selectOblastStateMap(useAlertsStore.getState());
+      const subscribed = readSubscribedOblast();
       let changed = false;
       for (const f of geo.features) {
         const title = (f.properties as { full_name_uk?: string } | null)?.full_name_uk;
-        const next = title && titles.has(title) ? "active" : "safe";
-        if ((f.properties as { state?: string } | null)?.state !== next) {
+        const next = (title && states.get(title)) || "safe";
+        const nextSubscribed = !!(title && subscribed && title === subscribed);
+        const props = f.properties as { state?: string; subscribed?: boolean } | null;
+        if (props?.state !== next || props?.subscribed !== nextSubscribed) {
           (f.properties as Record<string, unknown>).state = next;
+          (f.properties as Record<string, unknown>).subscribed = nextSubscribed;
           changed = true;
         }
       }
@@ -429,11 +493,17 @@ export function Map() {
     const unsubscribeDrones = useDronesStore.subscribe(applyDroneState);
     const unsubscribeTracks = useTracksStore.subscribe(applyTracksState);
 
+    const onPushRegionChange = () => applyAlertState();
+    window.addEventListener("storage", onPushRegionChange);
+    window.addEventListener(PUSH_REGION_EVENT, onPushRegionChange);
+
     return () => {
       cancelled = true;
       unsubscribe();
       unsubscribeDrones();
       unsubscribeTracks();
+      window.removeEventListener("storage", onPushRegionChange);
+      window.removeEventListener(PUSH_REGION_EVENT, onPushRegionChange);
       map.remove();
       mapRef.current = null;
     };

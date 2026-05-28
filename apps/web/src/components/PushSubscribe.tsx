@@ -33,6 +33,8 @@ function saveRegion(value: string) {
   if (typeof window === "undefined") return;
   if (value === ALL_UA) localStorage.removeItem("deshahed.pushRegion");
   else localStorage.setItem("deshahed.pushRegion", value);
+  // Map.tsx listens for this to repaint the oblast border without reload.
+  window.dispatchEvent(new CustomEvent("deshahed:pushRegionChange"));
 }
 
 export function PushSubscribe() {

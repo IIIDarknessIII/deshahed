@@ -30,6 +30,9 @@ class AlertView(BaseModel):
     # location_title / location_uid.
     location_oblast: str | None = None
     location_oblast_uid: int | None = None
+    # alerts.in.ua's free-text describing the threat. When it contains "БпЛА"
+    # or "дрон" the frontend escalates the cell color to the shahed tier.
+    notes: str | None = None
 
 
 class SnapshotMessage(BaseModel):
