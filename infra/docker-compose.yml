@@ -45,6 +45,9 @@ services:
       REDIS_URL: redis://redis:6379/0
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
       SENTRY_DSN: ${SENTRY_DSN:-}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:noreply@xn----8sbkccc5iwa.online}
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:
