@@ -1,11 +1,14 @@
 "use client";
 
+import { useShallow } from "zustand/react/shallow";
 import { useAlertsStore, selectAlertsList } from "@/stores/alertsStore";
 import { formatDuration } from "@/lib/format";
 
 export function AlertsPanel() {
   const connected = useAlertsStore((s) => s.connected);
-  const alerts = useAlertsStore(selectAlertsList);
+  // selectAlertsList returns a fresh Array each call; useShallow keeps the
+  // hook stable when the alert set hasn't actually changed.
+  const alerts = useAlertsStore(useShallow(selectAlertsList));
   const now = Date.now();
 
   return (
