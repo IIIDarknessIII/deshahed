@@ -5,6 +5,7 @@ import { Flame, LineChart, X } from "lucide-react";
 import { useStatsSummary } from "@/hooks/useStats";
 import { useUiStore, type HeatmapPeriod } from "@/stores/uiStore";
 import { formatDuration } from "@/lib/format";
+import { PushSubscribe } from "@/components/PushSubscribe";
 
 const HEATMAP_PERIODS: { value: HeatmapPeriod; label: string }[] = [
   { value: "day", label: "Доба" },
@@ -79,6 +80,10 @@ export function StatsPanel() {
           label="Сумарний час"
           value={formatDuration(totalDurationMin * 60_000)}
         />
+      </div>
+
+      <div className="border-t border-border px-4 py-3">
+        <PushSubscribe />
       </div>
 
       <div className="border-t border-border px-4 py-3">
