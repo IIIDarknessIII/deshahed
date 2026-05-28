@@ -70,9 +70,8 @@ async def _run(stop: asyncio.Event) -> None:
     redis = aioredis.from_url(redis_url, decode_responses=False)
 
     client = TelegramClient(str(SESSION_PATH), api_id, api_hash)
-    log.info("connecting telethon, channels=%s", channels)
+    log.info("connecting telethon, requested channels=%s", channels)
 
-    @client.on(events.NewMessage(chats=channels))
     async def handler(event):
         chat = await event.get_chat()
         username = getattr(chat, "username", None) or str(getattr(chat, "id", ""))
@@ -96,6 +95,24 @@ async def _run(stop: asyncio.Event) -> None:
 
     await client.start()
     log.info("connected as %s", await client.get_me())
+
+    # Resolve each requested channel — skip the ones that don't exist /
+    # aren't accessible by this account, so a single typo in TG_CHANNELS
+    # doesn't take down the whole listener.
+    valid: list[str] = []
+    for ch in channels:
+        try:
+            entity = await client.get_entity(ch)
+            valid.append(ch)
+            log.info("subscribed: @%s (id=%s)", ch, getattr(entity, "id", "?"))
+        except Exception as e:
+            log.warning("skipping channel @%s: %s", ch, str(e)[:200])
+
+    if not valid:
+        log.error("no resolvable channels in TG_CHANNELS=%s — exiting", channels)
+        raise SystemExit(2)
+
+    client.add_event_handler(handler, events.NewMessage(chats=valid))
 
     stop_task = asyncio.create_task(stop.wait())
     disconnect_task = asyncio.create_task(client.run_until_disconnected())
