@@ -17,3 +17,4 @@ pymorphy3-dicts-uk==2.4.1.1.1663094765
 pyahocorasick==2.1.0
 rapidfuzz==3.10.1
 qrcode==8.0
+h3==4.1.0

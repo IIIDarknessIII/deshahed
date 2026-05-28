@@ -10,7 +10,8 @@ from sqlalchemy import text
 
 from app.config import get_settings
 from app.db import dispose, get_session_factory
-from app.routes import alerts, drones, health, tracks, ws_alerts
+from app.heatmap_worker import loop as heatmap_loop
+from app.routes import alerts, drones, health, heatmap, tracks, ws_alerts
 
 log = logging.getLogger("uvicorn.error").getChild("lifespan")
 
@@ -66,15 +67,17 @@ async def _close_stale_tracks_loop(stop: asyncio.Event) -> None:
 async def lifespan(app: FastAPI):
     stop = asyncio.Event()
     sweep_task = asyncio.create_task(_close_stale_tracks_loop(stop))
+    heatmap_task = asyncio.create_task(heatmap_loop(stop))
     try:
         yield
     finally:
         stop.set()
-        sweep_task.cancel()
-        try:
-            await sweep_task
-        except (asyncio.CancelledError, Exception):
-            pass
+        for t in (sweep_task, heatmap_task):
+            t.cancel()
+            try:
+                await t
+            except (asyncio.CancelledError, Exception):
+                pass
         await dispose()
 
 
@@ -103,6 +106,7 @@ def create_app() -> FastAPI:
     app.include_router(alerts.router)
     app.include_router(drones.router)
     app.include_router(tracks.router)
+    app.include_router(heatmap.router)
     app.include_router(ws_alerts.router)
     return app
 
