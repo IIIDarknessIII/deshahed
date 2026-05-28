@@ -52,3 +52,21 @@ export interface DroneEvent {
 export type DroneWsMessage =
   | { type: "drone_snapshot"; drones: DroneEvent[] }
   | { type: "drone_appeared"; drone: DroneEvent };
+
+export interface DroneTrack {
+  id: string;
+  event_type: DroneEventType;
+  first_seen_at: string;
+  last_seen_at: string;
+  point_count: number;
+  is_active: boolean;
+  confidence: "high" | "medium" | "low" | null;
+  /** GeoJSON LineString; null while point_count === 1. */
+  path: { type: "LineString"; coordinates: [number, number][] } | null;
+  last_lat: number;
+  last_lon: number;
+}
+
+export type TrackWsMessage =
+  | { type: "track_snapshot"; tracks: DroneTrack[] }
+  | { type: "track_updated"; track: DroneTrack };

@@ -4,9 +4,10 @@ import { useEffect, useRef } from "react";
 import maplibregl, { type Map as MapLibreMap } from "maplibre-gl";
 import { useAlertsStore, selectActiveTitles } from "@/stores/alertsStore";
 import { useDronesStore } from "@/stores/dronesStore";
+import { useTracksStore } from "@/stores/tracksStore";
 import { useUiStore } from "@/stores/uiStore";
 import { UID_BY_TITLE } from "@/lib/locations";
-import type { DroneEvent } from "@/lib/types";
+import type { DroneEvent, DroneTrack } from "@/lib/types";
 
 const SOURCE_ID = "oblasts";
 const FILL_LAYER = "oblasts-fill";
@@ -16,6 +17,10 @@ const DRONES_SOURCE = "drones";
 const DRONES_POINT_LAYER = "drones-point";
 const DRONE_TRACKS_SOURCE = "drone-tracks";
 const DRONE_TRACKS_LAYER = "drone-tracks";
+
+const TRAJECTORIES_SOURCE = "trajectories";
+const TRAJECTORIES_LINE_LAYER = "trajectories-line";
+const TRAJECTORIES_HEAD_LAYER = "trajectories-head";
 
 const STYLE: maplibregl.StyleSpecification = {
   version: 8,
@@ -150,7 +155,61 @@ export function Map() {
         },
       });
 
+      // Multi-point trajectories (Phase 3). Solid line vs the dashed
+      // direction-projection of single events.
+      map.addSource(TRAJECTORIES_SOURCE, {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+      });
+      map.addLayer(
+        {
+          id: TRAJECTORIES_LINE_LAYER,
+          type: "line",
+          source: TRAJECTORIES_SOURCE,
+          filter: ["==", ["geometry-type"], "LineString"],
+          paint: {
+            "line-color": [
+              "match",
+              ["get", "event_type"],
+              "shahed", "#fb923c",
+              "missile", "#dc2626",
+              "kab", "#a855f7",
+              "aviation", "#38bdf8",
+              "#9ca3af",
+            ],
+            "line-width": 2,
+            "line-opacity": 0.85,
+          },
+        },
+        DRONE_TRACKS_LAYER,
+      );
+      map.addLayer(
+        {
+          id: TRAJECTORIES_HEAD_LAYER,
+          type: "circle",
+          source: TRAJECTORIES_SOURCE,
+          filter: ["==", ["geometry-type"], "Point"],
+          paint: {
+            "circle-radius": 4,
+            "circle-color": [
+              "match",
+              ["get", "event_type"],
+              "shahed", "#fb923c",
+              "missile", "#dc2626",
+              "kab", "#a855f7",
+              "aviation", "#38bdf8",
+              "#9ca3af",
+            ],
+            "circle-stroke-color": "#0a0a0b",
+            "circle-stroke-width": 1,
+            "circle-opacity": 0.95,
+          },
+        },
+        DRONES_POINT_LAYER,
+      );
+
       applyDroneState();
+      applyTracksState();
 
       // Hover popup with region name + active-alert duration.
       const popup = new maplibregl.Popup({
@@ -270,13 +329,51 @@ export function Map() {
       });
     };
 
+    const applyTracksState = () => {
+      const m = mapRef.current;
+      if (!m) return;
+      const src = m.getSource(TRAJECTORIES_SOURCE) as
+        | maplibregl.GeoJSONSource
+        | undefined;
+      if (!src) return;
+      const tracks = Array.from(useTracksStore.getState().tracks.values());
+      const features: GeoJSON.Feature[] = [];
+      for (const t of tracks) {
+        if (t.path && t.path.coordinates.length >= 2) {
+          features.push({
+            type: "Feature",
+            geometry: t.path,
+            properties: {
+              id: t.id,
+              event_type: t.event_type,
+              point_count: t.point_count,
+            },
+          });
+        }
+        // Head marker (always — gives a point even for single-point tracks).
+        features.push({
+          type: "Feature",
+          geometry: { type: "Point", coordinates: [t.last_lon, t.last_lat] },
+          properties: {
+            id: t.id,
+            event_type: t.event_type,
+            point_count: t.point_count,
+            head: true,
+          },
+        });
+      }
+      src.setData({ type: "FeatureCollection", features });
+    };
+
     const unsubscribe = useAlertsStore.subscribe(applyAlertState);
     const unsubscribeDrones = useDronesStore.subscribe(applyDroneState);
+    const unsubscribeTracks = useTracksStore.subscribe(applyTracksState);
 
     return () => {
       cancelled = true;
       unsubscribe();
       unsubscribeDrones();
+      unsubscribeTracks();
       map.remove();
       mapRef.current = null;
     };
