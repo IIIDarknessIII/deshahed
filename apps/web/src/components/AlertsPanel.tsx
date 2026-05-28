@@ -1,7 +1,9 @@
 "use client";
 
+import { X } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { useAlertsStore, selectAlertsList } from "@/stores/alertsStore";
+import { useUiStore } from "@/stores/uiStore";
 import { formatDuration } from "@/lib/format";
 
 export function AlertsPanel() {
@@ -9,22 +11,44 @@ export function AlertsPanel() {
   // selectAlertsList returns a fresh Array each call; useShallow keeps the
   // hook stable when the alert set hasn't actually changed.
   const alerts = useAlertsStore(useShallow(selectAlertsList));
+  const mobileSheet = useUiStore((s) => s.mobileSheet);
+  const setMobileSheet = useUiStore((s) => s.setMobileSheet);
+  const isMobileOpen = mobileSheet === "alerts";
   const now = Date.now();
 
   return (
-    <aside className="flex h-full w-80 shrink-0 flex-col border-r border-border bg-bg/95 backdrop-blur">
+    <aside
+      className={
+        "flex flex-col border-border bg-bg/95 backdrop-blur transition-transform duration-300 " +
+        // Desktop: left static sidebar
+        "md:relative md:h-full md:w-80 md:shrink-0 md:border-r md:translate-y-0 " +
+        // Mobile: bottom sheet
+        "fixed inset-x-0 bottom-0 z-40 h-[70vh] rounded-t-xl border " +
+        (isMobileOpen ? "translate-y-0" : "translate-y-full md:translate-y-0")
+      }
+    >
       <header className="flex items-center justify-between border-b border-border px-4 py-3">
         <div>
           <div className="text-base font-semibold text-zinc-100">deshahed</div>
           <div className="text-xs text-zinc-500">карта тривог</div>
         </div>
-        <span
-          className={
-            "inline-flex h-2.5 w-2.5 rounded-full " +
-            (connected ? "bg-emerald-500" : "bg-zinc-600")
-          }
-          title={connected ? "WS підключено" : "WS відключено"}
-        />
+        <div className="flex items-center gap-2">
+          <span
+            className={
+              "inline-flex h-2.5 w-2.5 rounded-full " +
+              (connected ? "bg-emerald-500" : "bg-zinc-600")
+            }
+            title={connected ? "WS підключено" : "WS відключено"}
+          />
+          <button
+            type="button"
+            onClick={() => setMobileSheet(null)}
+            className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 md:hidden"
+            aria-label="Закрити"
+          >
+            <X size={18} />
+          </button>
+        </div>
       </header>
 
       <div className="px-4 py-3 text-xs uppercase tracking-wide text-zinc-500">

@@ -1,6 +1,8 @@
 "use client";
 
+import { X } from "lucide-react";
 import { useStatsSummary } from "@/hooks/useStats";
+import { useUiStore } from "@/stores/uiStore";
 import { formatDuration } from "@/lib/format";
 
 function StatCard({ label, value }: { label: string; value: string }) {
@@ -18,16 +20,36 @@ function StatCard({ label, value }: { label: string; value: string }) {
 
 export function StatsPanel() {
   const { data, isLoading, isError } = useStatsSummary("day");
+  const mobileSheet = useUiStore((s) => s.mobileSheet);
+  const setMobileSheet = useUiStore((s) => s.setMobileSheet);
+  const isMobileOpen = mobileSheet === "stats";
 
   const totalAlerts = data?.total_alerts ?? 0;
   const totalDurationMin = data?.total_duration_minutes ?? 0;
   const top3 = (data?.by_oblast ?? []).slice(0, 3);
 
   return (
-    <aside className="flex h-full w-80 shrink-0 flex-col border-l border-border bg-bg/95 backdrop-blur">
-      <header className="border-b border-border px-4 py-3">
-        <div className="text-base font-semibold text-zinc-100">Статистика</div>
-        <div className="text-xs text-zinc-500">за добу</div>
+    <aside
+      className={
+        "flex flex-col border-border bg-bg/95 backdrop-blur transition-transform duration-300 " +
+        "md:relative md:h-full md:w-80 md:shrink-0 md:border-l md:translate-y-0 " +
+        "fixed inset-x-0 bottom-0 z-40 h-[70vh] rounded-t-xl border " +
+        (isMobileOpen ? "translate-y-0" : "translate-y-full md:translate-y-0")
+      }
+    >
+      <header className="flex items-center justify-between border-b border-border px-4 py-3">
+        <div>
+          <div className="text-base font-semibold text-zinc-100">Статистика</div>
+          <div className="text-xs text-zinc-500">за добу</div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setMobileSheet(null)}
+          className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 md:hidden"
+          aria-label="Закрити"
+        >
+          <X size={18} />
+        </button>
       </header>
 
       <div className="space-y-2.5 px-4 py-3">
