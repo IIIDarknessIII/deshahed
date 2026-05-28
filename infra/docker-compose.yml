@@ -97,6 +97,26 @@ services:
     restart: unless-stopped
     profiles: ["with-poller"]
 
+  llm_extractor:
+    build:
+      context: ../services/parser
+    image: deshahed-parser:dev
+    container_name: deshahed-llm-extractor
+    environment:
+      APP_ENV: ${APP_ENV:-dev}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-deshahed}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-deshahed}
+      REDIS_URL: redis://redis:6379/0
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-openai/gpt-4o-mini}
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - internal
+    restart: unless-stopped
+    profiles: ["with-extractor"]
+    command: ["python", "-m", "parser.llm_extractor"]
+
   web:
     build:
       context: ../apps/web
