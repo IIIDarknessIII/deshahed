@@ -71,6 +71,35 @@ async def get_active_alerts() -> ActiveAlertsResponse:
     )
 
 
+@router.get(
+    "/alerts/location/{location_uid}/active",
+    response_model=ActiveAlertsResponse,
+    summary="Active alerts touching a single location_uid",
+)
+async def get_active_alerts_for_location(location_uid: int) -> ActiveAlertsResponse:
+    """Mirror of alerts.in.ua's `/v1/alerts/{location_uid}/active.json`.
+
+    Matches both the alert's own location_uid and its oblast_uid, so a
+    request for an oblast UID returns every sub-region alert under it too.
+    """
+    if location_uid <= 0:
+        raise HTTPException(status_code=422, detail="location_uid must be positive")
+    factory = get_session_factory()
+    async with factory() as session:
+        result = await session.execute(
+            select(AlertEvent).where(
+                AlertEvent.finished_at.is_(None),
+                (AlertEvent.location_uid == location_uid)
+                | (AlertEvent.location_oblast_uid == location_uid),
+            ).order_by(AlertEvent.started_at.desc())
+        )
+        rows = result.scalars().all()
+    return ActiveAlertsResponse(
+        alerts=[AlertView.model_validate(r) for r in rows],
+        updated_at=datetime.now(timezone.utc),
+    )
+
+
 @router.get("/alerts/history", response_model=HistoryResponse)
 async def get_alerts_history(
     location_uid: int | None = Query(None, description="alerts.in.ua location_uid (precise sub-region)"),

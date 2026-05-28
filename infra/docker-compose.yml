@@ -48,6 +48,10 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:noreply@xn----8sbkccc5iwa.online}
+      # Used only by the IoT proxy routes (/api/v1/iot/*). The poller still
+      # owns the live ingestion path; the api just needs its own copy of the
+      # bearer to relay alerts.in.ua's iot endpoints with caching.
+      ALERTS_API_TOKEN: ${ALERTS_API_TOKEN:-}
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:
