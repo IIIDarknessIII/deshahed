@@ -52,20 +52,22 @@ async def _send_one(endpoint: str, p256dh: str, auth: str, payload: dict) -> tup
 
 
 async def _broadcast_alert(alert: dict) -> None:
-    location_uid = int(alert.get("location_uid", -1))
     location_title = alert.get("location_title", "Тривога")
+    # Match by parent oblast string — alerts.in.ua's location_oblast_uid is
+    # unreliable, but the title is canonical.
+    location_oblast = alert.get("location_oblast") or location_title
     factory = get_session_factory()
     async with factory() as session:
-        # Subscribers either targeting this region OR opted into all of UA.
+        # Subscribers either targeting this oblast OR opted into all of UA.
         rows = (await session.execute(
             text(
                 """
                 SELECT id, endpoint, p256dh, auth
                 FROM push_subscriptions
-                WHERE region_uid IS NULL OR region_uid = :uid
+                WHERE region_oblast IS NULL OR region_oblast = :oblast
                 """
             ),
-            {"uid": location_uid},
+            {"oblast": location_oblast},
         )).all()
 
         if not rows:
@@ -73,8 +75,8 @@ async def _broadcast_alert(alert: dict) -> None:
 
         payload = {
             "title": f"Тривога · {location_title}",
-            "body": "Повітряна тривога в Україні",
-            "tag": f"alert-{location_uid}-{alert.get('alert_type', 'air_raid')}",
+            "body": f"Повітряна тривога — {location_oblast}",
+            "tag": f"alert-{alert.get('location_uid', '')}-{alert.get('alert_type', 'air_raid')}",
             "url": "/",
         }
 

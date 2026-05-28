@@ -42,7 +42,10 @@ async def get_public_key() -> VapidPublicKeyResponse:
 class SubscribeRequest(BaseModel):
     endpoint: str
     keys: dict = Field(..., description="{p256dh, auth}")
-    region_uid: int | None = None
+    # Canonical oblast title — same string alerts.in.ua puts in `location_oblast`.
+    # Null = subscribe to all of Ukraine.
+    region_oblast: str | None = None
+    region_uid: int | None = None  # legacy field, ignored
 
 
 @router.post("/subscribe")
@@ -63,7 +66,7 @@ async def subscribe(req: SubscribeRequest, request: Request) -> dict:
                 endpoint=req.endpoint,
                 p256dh=p256dh,
                 auth=auth,
-                region_uid=req.region_uid,
+                region_oblast=req.region_oblast,
                 user_agent=ua,
                 created_at=now,
                 last_seen_at=now,
@@ -73,7 +76,7 @@ async def subscribe(req: SubscribeRequest, request: Request) -> dict:
                 set_={
                     "p256dh": p256dh,
                     "auth": auth,
-                    "region_uid": req.region_uid,
+                    "region_oblast": req.region_oblast,
                     "user_agent": ua,
                     "last_seen_at": now,
                 },
@@ -81,7 +84,7 @@ async def subscribe(req: SubscribeRequest, request: Request) -> dict:
         )
         await session.execute(stmt)
         await session.commit()
-    log.info("push subscribe: region=%s ua=%s", req.region_uid, (ua or "?")[:60])
+    log.info("push subscribe: region=%r ua=%s", req.region_oblast, (ua or "?")[:60])
     return {"status": "ok"}
 
 
