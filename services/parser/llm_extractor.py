@@ -46,7 +46,7 @@ import pymorphy3
 
 from .gazetteer import load_gazetteer
 from .local_extractor import LocalExtraction, LocalExtractor
-from .track_assembler import assemble as track_assemble
+from .track_assembler import assemble as track_assemble, load_track_view
 
 log = logging.getLogger("llm_extractor")
 
@@ -54,6 +54,7 @@ STREAM_RAW = "messages_raw"
 STREAM_DLQ = "messages_dlq"
 CONSUMER_GROUP = "llm-extractor"
 PUBSUB_CHANNEL = "drones:updates"
+PUBSUB_CHANNEL_TRACKS = "tracks:updates"
 
 CACHE_PREFIX = "llm:cache:"
 CACHE_TTL_SEC = 24 * 3600
@@ -358,9 +359,10 @@ async def _persist_and_publish(
 
     # Phase 3 track assembly — its own transaction so a failure here doesn't
     # roll back the drone_events row we just persisted.
+    track_id = None
     async with factory() as track_session:
         try:
-            await track_assemble(
+            track_id, _is_new = await track_assemble(
                 track_session,
                 event_type=event.type,
                 lat=loc.lat,
@@ -372,6 +374,21 @@ async def _persist_and_publish(
         except Exception:
             await track_session.rollback()
             log.exception("track_assemble failed for event #%s — event kept, track skipped", new_id)
+
+    # Publish track update so the /ws/tracks subscribers get a live refresh.
+    if track_id is not None:
+        try:
+            async with factory() as s:
+                view = await load_track_view(s, track_id)
+            if view is not None:
+                # path is jsonb from postgres — already a dict; just JSON-serialize.
+                payload = json.dumps(
+                    {"type": "track_updated", "track": view},
+                    ensure_ascii=False, default=str,
+                )
+                await redis.publish(PUBSUB_CHANNEL_TRACKS, payload)
+        except Exception:
+            log.exception("track publish failed (event #%s, track %s)", new_id, track_id)
 
     view = DroneEventView(
         id=new_id,

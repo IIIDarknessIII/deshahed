@@ -78,9 +78,9 @@ async def assemble(
     lon: float,
     detected_at: datetime,
     confidence: str | None = None,
-) -> uuid.UUID:
-    """Attach to an existing active track or create a new one. Returns the
-    track id. Caller is responsible for `await session.commit()`."""
+) -> tuple[uuid.UUID, bool]:
+    """Attach to an existing active track or create a new one. Returns
+    (track_id, is_new). Caller is responsible for `await session.commit()`."""
     rows = (await session.execute(
         CANDIDATES_SQL,
         {
@@ -93,8 +93,7 @@ async def assemble(
         },
     )).all()
 
-    # Filter by distance gate and direction cosine. Postgres NUMERIC columns
-    # come back as decimal.Decimal under asyncpg — cast to float for arith.
+    # Postgres NUMERIC → decimal.Decimal under asyncpg; cast to float.
     valid: list[object] = []
     for c in rows:
         time_delta_min = float(c.time_delta_min)
@@ -104,7 +103,6 @@ async def assemble(
             continue
         if not _direction_ok(c, lon, lat):
             continue
-        # Stash the float versions on the row for later use.
         c = type("Row", (), {**c._asdict(), "time_delta_min": time_delta_min, "dist_km": dist_km})()
         valid.append(c)
 
@@ -115,12 +113,34 @@ async def assemble(
             "track: appended point #%d to %s (Δt=%.1fmin, d=%.1fkm)",
             best.point_count + 1, best.id, best.time_delta_min, best.dist_km,
         )
-        return best.id
+        return best.id, False
 
     new_id = uuid.uuid4()
     await _create_track(session, new_id, event_type, lat, lon, detected_at, confidence)
     log.info("track: created %s (first point)", new_id)
-    return new_id
+    return new_id, True
+
+
+LOAD_TRACK_VIEW_SQL = text(
+    """
+    SELECT id::text AS id,
+           event_type,
+           first_seen_at, last_seen_at, point_count, is_active, confidence,
+           CASE WHEN path IS NULL THEN NULL
+                ELSE ST_AsGeoJSON(path::geometry)::jsonb
+           END                                            AS path,
+           ST_Y(last_point::geometry)                     AS last_lat,
+           ST_X(last_point::geometry)                     AS last_lon
+    FROM drone_tracks
+    WHERE id = :id
+    """
+)
+
+
+async def load_track_view(session: AsyncSession, track_id: uuid.UUID) -> dict | None:
+    """Read a single track in TrackView shape (json-ready dict)."""
+    row = (await session.execute(LOAD_TRACK_VIEW_SQL, {"id": str(track_id)})).mappings().first()
+    return dict(row) if row else None
 
 
 async def _create_track(

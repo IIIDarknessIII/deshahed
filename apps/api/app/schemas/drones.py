@@ -48,3 +48,31 @@ class DroneSnapshotMessage(BaseModel):
 class DroneAppearedMessage(BaseModel):
     type: Literal["drone_appeared"] = "drone_appeared"
     drone: DroneEventView
+
+
+class TrackView(BaseModel):
+    """One trajectory of a physical drone, suitable for direct render on MapLibre."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    event_type: DroneEventType
+    first_seen_at: datetime
+    last_seen_at: datetime
+    point_count: int
+    is_active: bool
+    confidence: ConfidenceLevel | None
+    # GeoJSON LineString; null while point_count == 1.
+    path: dict | None = None
+    last_lat: float
+    last_lon: float
+
+
+class TrackSnapshotMessage(BaseModel):
+    type: Literal["track_snapshot"] = "track_snapshot"
+    tracks: list[TrackView]
+
+
+class TrackUpdatedMessage(BaseModel):
+    type: Literal["track_updated"] = "track_updated"
+    track: TrackView

@@ -10,7 +10,7 @@ from sqlalchemy import text
 
 from app.config import get_settings
 from app.db import dispose, get_session_factory
-from app.routes import alerts, drones, health, ws_alerts
+from app.routes import alerts, drones, health, tracks, ws_alerts
 
 log = logging.getLogger("uvicorn.error").getChild("lifespan")
 
@@ -102,6 +102,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(alerts.router)
     app.include_router(drones.router)
+    app.include_router(tracks.router)
     app.include_router(ws_alerts.router)
     return app
 
