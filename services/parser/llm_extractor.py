@@ -281,7 +281,8 @@ async def _run(stop: asyncio.Event) -> None:
         base_url=OPENROUTER_BASE_URL,
         api_key=api_key,
         default_headers={
-            "HTTP-Referer": "https://де-шахед.online",
+            # HTTP headers must be ASCII (RFC 7230); IDN domain → punycode.
+            "HTTP-Referer": "https://xn----8sbkccc5iwa.online",
             "X-Title": "deshahed",
         },
         timeout=20.0,
