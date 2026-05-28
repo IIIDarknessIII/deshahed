@@ -18,7 +18,6 @@ const STYLE: maplibregl.StyleSpecification = {
       paint: { "background-color": "#0a0a0b" },
     },
   ],
-  glyphs: undefined,
 };
 
 export function Map() {
@@ -28,6 +27,7 @@ export function Map() {
 
   useEffect(() => {
     if (!containerRef.current) return;
+    let cancelled = false;
 
     const map = new maplibregl.Map({
       container: containerRef.current,
@@ -41,8 +41,11 @@ export function Map() {
     mapRef.current = map;
 
     map.on("load", async () => {
+      if (cancelled) return;
       const resp = await fetch("/geo/oblasts.geojson");
+      if (cancelled) return;
       const geo = (await resp.json()) as GeoJSON.FeatureCollection;
+      if (cancelled) return;
       geojsonRef.current = geo;
 
       // Mark each feature with state="safe" initially; we mutate state from store.
@@ -116,6 +119,7 @@ export function Map() {
     const unsubscribe = useAlertsStore.subscribe(applyAlertState);
 
     return () => {
+      cancelled = true;
       unsubscribe();
       map.remove();
       mapRef.current = null;
