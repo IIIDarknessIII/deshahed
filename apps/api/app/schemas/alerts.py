@@ -40,3 +40,41 @@ class AlertEndedMessage(BaseModel):
     type: Literal["alert_ended"] = "alert_ended"
     location_uid: int
     alert_type: AlertType
+
+
+class ActiveAlertsResponse(BaseModel):
+    alerts: list[AlertView]
+    updated_at: datetime
+
+
+class HistoryItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    location_uid: int
+    location_title: str
+    location_type: LocationType
+    alert_type: AlertType
+    started_at: datetime
+    finished_at: datetime | None
+    duration_seconds: int
+
+
+class HistoryResponse(BaseModel):
+    location_uid: int
+    period: str
+    items: list[HistoryItem]
+
+
+class OblastStat(BaseModel):
+    location_uid: int
+    location_title: str
+    count: int
+    duration_minutes: int
+
+
+class SummaryResponse(BaseModel):
+    period: str
+    total_alerts: int
+    total_duration_minutes: int
+    by_oblast: list[OblastStat]

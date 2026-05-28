@@ -33,9 +33,13 @@ import json
 import logging
 import random
 import sys
+
 from datetime import datetime, timezone
 
-from app.db import dispose, get_redis
+from sqlalchemy import update
+
+from app.db import dispose, get_redis, get_session_factory
+from app.models import AlertEvent
 
 log = logging.getLogger("mock_alerts")
 
@@ -114,9 +118,49 @@ async def _publish(payload: dict) -> None:
     await get_redis().publish(REDIS_CHANNEL_UPDATES, json.dumps(payload, ensure_ascii=False))
 
 
+async def _db_insert_started(alert: dict) -> None:
+    """Mirror what the real alerts_poller does: insert a fresh row for a new alert."""
+    factory = get_session_factory()
+    async with factory() as session:
+        session.add(
+            AlertEvent(
+                location_uid=alert["location_uid"],
+                location_title=alert["location_title"],
+                location_type=alert["location_type"],
+                alert_type=alert["alert_type"],
+                started_at=datetime.fromisoformat(alert["started_at"]),
+                finished_at=None,
+                raw_payload=alert,
+            )
+        )
+        await session.commit()
+
+
+async def _db_mark_ended(uid: int, alert_type: str) -> None:
+    factory = get_session_factory()
+    async with factory() as session:
+        await session.execute(
+            update(AlertEvent)
+            .where(
+                AlertEvent.location_uid == uid,
+                AlertEvent.alert_type == alert_type,
+                AlertEvent.finished_at.is_(None),
+            )
+            .values(finished_at=datetime.now(timezone.utc))
+        )
+        await session.commit()
+
+
 async def cmd_snapshot(args: argparse.Namespace) -> None:
+    # End any currently-active mock alerts in DB so duration accounting stays sane.
+    prev = await _read_current()
+    for a in prev:
+        await _db_mark_ended(a["location_uid"], a["alert_type"])
+
     sample_uids = random.sample([uid for uid, _, _ in LOCATIONS], k=min(args.count, 5))
     alerts = [_build_alert(uid, "air_raid") for uid in sample_uids]
+    for a in alerts:
+        await _db_insert_started(a)
     await _write_current(alerts)
     print(f"wrote {len(alerts)} alert(s) to {REDIS_KEY_CURRENT}: " + ", ".join(a["location_title"] for a in alerts))
 
@@ -131,6 +175,7 @@ async def cmd_start(args: argparse.Namespace) -> None:
     current = await _read_current()
     current = [a for a in current if not (a["location_uid"] == args.uid and a["alert_type"] == args.alert_type)]
     current.append(alert)
+    await _db_insert_started(alert)
     await _write_current(current)
     await _publish({"type": "alert_started", "alert": alert})
     print(f"started: {alert['location_title']} / {args.alert_type}")
@@ -140,6 +185,7 @@ async def cmd_end(args: argparse.Namespace) -> None:
     current = await _read_current()
     before = len(current)
     current = [a for a in current if not (a["location_uid"] == args.uid and a["alert_type"] == args.alert_type)]
+    await _db_mark_ended(args.uid, args.alert_type)
     await _write_current(current)
     await _publish({"type": "alert_ended", "location_uid": args.uid, "alert_type": args.alert_type})
     title = LOCATION_BY_UID[args.uid][0]
