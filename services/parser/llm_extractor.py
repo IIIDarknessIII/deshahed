@@ -3,15 +3,18 @@
   [1] local_extractor    pymorphy3 lemmas + Aho-Corasick gazetteer
                          covers ~70-85% of straightforward TG phrases
                          for free, in milliseconds, no network call.
-  [2] OpenRouter FREE    catches what the heuristic punts on, using a
-                         no-cost model (default
-                         meta-llama/llama-3.2-3b-instruct:free).
-  [3] OpenRouter PAID    only kicks in when [2] errors / rate-limits.
+  [2] OpenRouter FREE    cycles through every model on OpenRouter whose
+                         pricing.prompt == pricing.completion == "0" at
+                         startup (or one explicit OPENROUTER_FREE_MODEL).
+                         A 5-minute cooldown skips models that just
+                         returned 402/429/5xx so we don't waste calls.
+  [3] OpenRouter PAID    only kicks in when every available free model
+                         is on cooldown or has failed.
 
 Common downstream: geocoder.resolve() → drone_events row → publish
 DroneAppearedMessage on `drones:updates` for the WS broadcaster.
 
-Refuses to start if OPENROUTER_API_KEY is empty (both tiers go through it).
+Refuses to start if OPENROUTER_API_KEY is empty (all tiers share it).
 """
 from __future__ import annotations
 
@@ -55,11 +58,60 @@ CACHE_TTL_SEC = 24 * 3600
 TTL_MIN = 15
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-DEFAULT_FREE_MODEL = "meta-llama/llama-3.2-3b-instruct:free"
 DEFAULT_PAID_MODEL = "openai/gpt-4o-mini"
+FREE_MODEL_COOLDOWN_SEC = 300  # 5 minutes after a hard failure
 
 # Counters reported once a minute so the cascade savings are observable.
 _stats = {"local": 0, "free": 0, "paid": 0, "free_failed": 0, "paid_failed": 0}
+
+
+class FreeModelRing:
+    """Rotating list of OpenRouter free-tier models with per-model cooldown.
+
+    A model that returns 402 (spend cap), 429 (rate limit) or 5xx is parked
+    for FREE_MODEL_COOLDOWN_SEC; meanwhile the ring serves the next one. If
+    every model is on cooldown the caller falls through to the paid tier.
+    """
+
+    def __init__(self, models: list[str]) -> None:
+        self.models = list(models)
+        self._fail_at: dict[str, float] = {}
+
+    def available(self) -> list[str]:
+        now = time.monotonic()
+        return [
+            m for m in self.models
+            if (now - self._fail_at.get(m, 0.0)) > FREE_MODEL_COOLDOWN_SEC
+        ]
+
+    def mark_failed(self, model: str) -> None:
+        self._fail_at[model] = time.monotonic()
+
+    def mark_success(self, model: str) -> None:
+        self._fail_at.pop(model, None)
+
+
+async def discover_free_models() -> list[str]:
+    """Fetch OpenRouter /models, return ids whose pricing.prompt and
+    pricing.completion are both "0" (i.e. genuinely no-cost). Falls back
+    to an empty list on network error — the caller can decide what to do."""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as h:
+            resp = await h.get(f"{OPENROUTER_BASE_URL}/models")
+            resp.raise_for_status()
+            body = resp.json()
+    except Exception:
+        log.exception("discover_free_models: /models fetch failed")
+        return []
+
+    out: list[str] = []
+    for m in body.get("data") or []:
+        pricing = m.get("pricing") or {}
+        if pricing.get("prompt") == "0" and pricing.get("completion") == "0":
+            mid = m.get("id")
+            if mid:
+                out.append(mid)
+    return out
 
 SYSTEM_PROMPT = """\
 Ти парсер повідомлень про повітряні загрози в Україні.
@@ -130,7 +182,7 @@ async def _try_llm_with_retry(
 
 async def _extract_with_cache(
     client: AsyncOpenAI,
-    free_model: str,
+    free_ring: FreeModelRing,
     paid_model: str,
     text: str,
     redis,
@@ -150,18 +202,22 @@ async def _extract_with_cache(
         await redis.set(CACHE_PREFIX + h, result.model_dump_json(), ex=CACHE_TTL_SEC)
         return result
 
-    # Tier 2: free LLM
-    try:
-        result = await _try_llm_with_retry(client, free_model, text)
-        _stats["free"] += 1
-        log.debug("free LLM (%s) used: %d event(s)", free_model, len(result.events))
-        await redis.set(CACHE_PREFIX + h, result.model_dump_json(), ex=CACHE_TTL_SEC)
-        return result
-    except Exception as e:
-        _stats["free_failed"] += 1
-        log.warning("free LLM %s failed: %s", free_model, str(e)[:200])
+    # Tier 2: iterate free models until one succeeds.
+    for model in free_ring.available():
+        try:
+            result = await _try_llm_with_retry(client, model, text)
+            free_ring.mark_success(model)
+            _stats["free"] += 1
+            log.debug("free LLM (%s) used: %d event(s)", model, len(result.events))
+            await redis.set(CACHE_PREFIX + h, result.model_dump_json(), ex=CACHE_TTL_SEC)
+            return result
+        except Exception as e:
+            free_ring.mark_failed(model)
+            _stats["free_failed"] += 1
+            log.warning("free model %s failed: %s", model, str(e)[:200])
+            continue
 
-    # Tier 3: paid LLM
+    # Tier 3: paid LLM (last resort).
     result = await _try_llm_with_retry(client, paid_model, text)
     _stats["paid"] += 1
     log.debug("paid LLM (%s) used: %d event(s)", paid_model, len(result.events))
@@ -254,7 +310,7 @@ async def _handle_message(
     fields: dict,
     *,
     client: AsyncOpenAI,
-    free_model: str,
+    free_ring: FreeModelRing,
     paid_model: str,
     redis,
     local: LocalExtractor,
@@ -285,7 +341,7 @@ async def _handle_message(
 
     try:
         extracted = await _extract_with_cache(
-            client, free_model, paid_model, text, redis, local
+            client, free_ring, paid_model, text, redis, local
         )
     except Exception:
         _stats["paid_failed"] += 1
@@ -318,15 +374,30 @@ async def _run(stop: asyncio.Event) -> None:
         log.error("OPENROUTER_API_KEY is not set; refusing to start")
         raise SystemExit(2)
 
-    # OPENROUTER_MODEL stays as the legacy alias for OPENROUTER_PAID_MODEL,
-    # so users that set just the one-tier var keep working.
-    free_model = os.environ.get("OPENROUTER_FREE_MODEL", DEFAULT_FREE_MODEL).strip()
+    # OPENROUTER_MODEL stays as the legacy alias for OPENROUTER_PAID_MODEL.
     paid_model = (
         os.environ.get("OPENROUTER_PAID_MODEL")
         or os.environ.get("OPENROUTER_MODEL")
         or DEFAULT_PAID_MODEL
     ).strip()
-    log.info("llm_extractor starting; free=%s paid=%s", free_model, paid_model)
+
+    # If the user pinned a specific free model, honor that. Otherwise
+    # auto-discover the full list from /models.
+    pinned_free = os.environ.get("OPENROUTER_FREE_MODEL", "").strip()
+    if pinned_free:
+        free_models = [pinned_free]
+        log.info("llm_extractor: pinned free model %s", pinned_free)
+    else:
+        free_models = await discover_free_models()
+        if free_models:
+            log.info("llm_extractor: discovered %d free models from OpenRouter", len(free_models))
+        else:
+            log.warning(
+                "llm_extractor: no free models discovered — every punt will go straight to paid (%s)",
+                paid_model,
+            )
+    free_ring = FreeModelRing(free_models)
+    log.info("llm_extractor starting; free=%d models, paid=%s", len(free_models), paid_model)
 
     client = AsyncOpenAI(
         base_url=OPENROUTER_BASE_URL,
@@ -379,7 +450,7 @@ async def _run(stop: asyncio.Event) -> None:
             for msg_id, fields in msgs:
                 ok = await _handle_message(
                     msg_id, fields,
-                    client=client, free_model=free_model, paid_model=paid_model,
+                    client=client, free_ring=free_ring, paid_model=paid_model,
                     redis=redis, local=local,
                 )
                 if ok:
