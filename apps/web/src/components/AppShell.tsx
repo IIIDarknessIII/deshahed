@@ -3,6 +3,7 @@
 import { useAlertsSocket } from "@/lib/ws";
 import { Map } from "@/components/Map";
 import { AlertsPanel } from "@/components/AlertsPanel";
+import { StatsPanel } from "@/components/StatsPanel";
 
 export function AppShell() {
   useAlertsSocket();
@@ -12,6 +13,7 @@ export function AppShell() {
       <div className="relative h-full flex-1">
         <Map />
       </div>
+      <StatsPanel />
     </main>
   );
 }
