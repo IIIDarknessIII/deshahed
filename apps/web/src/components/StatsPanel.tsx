@@ -1,6 +1,7 @@
 "use client";
 
-import { Flame, X } from "lucide-react";
+import Link from "next/link";
+import { Flame, LineChart, X } from "lucide-react";
 import { useStatsSummary } from "@/hooks/useStats";
 import { useUiStore, type HeatmapPeriod } from "@/stores/uiStore";
 import { formatDuration } from "@/lib/format";
@@ -52,14 +53,24 @@ export function StatsPanel() {
           <div className="text-base font-semibold text-zinc-100">Статистика</div>
           <div className="text-xs text-zinc-500">за добу</div>
         </div>
-        <button
-          type="button"
-          onClick={() => setMobileSheet(null)}
-          className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 md:hidden"
-          aria-label="Закрити"
-        >
-          <X size={18} />
-        </button>
+        <div className="flex items-center gap-1">
+          <Link
+            href="/stats"
+            className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+            aria-label="Детальна статистика"
+            title="Детальна статистика"
+          >
+            <LineChart size={18} />
+          </Link>
+          <button
+            type="button"
+            onClick={() => setMobileSheet(null)}
+            className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 md:hidden"
+            aria-label="Закрити"
+          >
+            <X size={18} />
+          </button>
+        </div>
       </header>
 
       <div className="space-y-2.5 px-4 py-3">

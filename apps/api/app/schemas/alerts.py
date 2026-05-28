@@ -78,3 +78,42 @@ class SummaryResponse(BaseModel):
     total_alerts: int
     total_duration_minutes: int
     by_oblast: list[OblastStat]
+
+
+class DailyBucket(BaseModel):
+    date: str
+    count: int
+    duration_minutes: int
+
+
+class DailyResponse(BaseModel):
+    period: str
+    items: list[DailyBucket]
+
+
+class DurationBucket(BaseModel):
+    range_min: int
+    range_max: int | None  # None for "240+"
+    count: int
+
+
+class DurationHistogramResponse(BaseModel):
+    period: str
+    total: int
+    median_minutes: float | None
+    p95_minutes: float | None
+    buckets: list[DurationBucket]
+
+
+class ComparisonStats(BaseModel):
+    label: str          # "today" | "yesterday"
+    date: str           # ISO date of this window
+    total_alerts: int
+    total_duration_minutes: int
+
+
+class ComparisonResponse(BaseModel):
+    today: ComparisonStats
+    yesterday: ComparisonStats
+    alerts_delta_pct: float | None       # null if yesterday=0 (undefined ratio)
+    duration_delta_pct: float | None

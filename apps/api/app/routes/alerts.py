@@ -20,11 +20,19 @@ from app.models import AlertEvent
 from app.schemas.alerts import (
     ActiveAlertsResponse,
     AlertView,
+    ComparisonResponse,
+    ComparisonStats,
+    DailyBucket,
+    DailyResponse,
+    DurationBucket,
+    DurationHistogramResponse,
     HistoryItem,
     HistoryResponse,
     OblastStat,
     SummaryResponse,
 )
+
+from sqlalchemy import text
 
 router = APIRouter(prefix="/api/v1", tags=["alerts"])
 
@@ -140,4 +148,173 @@ async def get_stats_summary(period: Period = Query("week")) -> SummaryResponse:
         total_alerts=total_alerts,
         total_duration_minutes=total_duration_minutes,
         by_oblast=by_oblast,
+    )
+
+
+# ---------- Phase 4.2 dashboard endpoints ----------
+
+
+_DAILY_SQL = text(
+    """
+    SELECT
+        DATE_TRUNC('day', started_at AT TIME ZONE 'UTC')::date AS day,
+        COUNT(*)                                                 AS cnt,
+        COALESCE(
+          SUM(
+            EXTRACT(EPOCH FROM (COALESCE(finished_at, NOW()) - started_at)) / 60
+          ),
+          0
+        )::int                                                   AS duration_min
+    FROM alert_events
+    WHERE started_at >= :start
+    GROUP BY day
+    ORDER BY day
+    """
+)
+
+
+@router.get("/stats/daily", response_model=DailyResponse)
+async def get_stats_daily(period: Period = Query("month")) -> DailyResponse:
+    start = _period_start(period)
+    if start is None:
+        # "all" — cap to last year so the chart stays renderable.
+        start = datetime.now(timezone.utc) - timedelta(days=365)
+
+    factory = get_session_factory()
+    async with factory() as session:
+        rows = (await session.execute(_DAILY_SQL, {"start": start})).all()
+
+    return DailyResponse(
+        period=period,
+        items=[
+            DailyBucket(date=str(r.day), count=int(r.cnt), duration_minutes=int(r.duration_min))
+            for r in rows
+        ],
+    )
+
+
+# Bucket widths in minutes, last bucket is "240+".
+_HISTOGRAM_EDGES_MIN = [0, 5, 15, 30, 60, 90, 120, 180, 240]
+
+
+@router.get("/stats/duration-histogram", response_model=DurationHistogramResponse)
+async def get_duration_histogram(period: Period = Query("month")) -> DurationHistogramResponse:
+    start = _period_start(period)
+
+    base_where = "WHERE finished_at IS NOT NULL"
+    params: dict[str, object] = {}
+    if start is not None:
+        base_where += " AND started_at >= :start"
+        params["start"] = start
+
+    factory = get_session_factory()
+    async with factory() as session:
+        stats_row = (
+            await session.execute(
+                text(
+                    f"""
+                    SELECT
+                      COUNT(*) AS total,
+                      PERCENTILE_CONT(0.50) WITHIN GROUP (
+                        ORDER BY EXTRACT(EPOCH FROM (finished_at - started_at)) / 60
+                      ) AS median_min,
+                      PERCENTILE_CONT(0.95) WITHIN GROUP (
+                        ORDER BY EXTRACT(EPOCH FROM (finished_at - started_at)) / 60
+                      ) AS p95_min
+                    FROM alert_events
+                    {base_where}
+                    """
+                ),
+                params,
+            )
+        ).one()
+
+        buckets: list[DurationBucket] = []
+        edges = _HISTOGRAM_EDGES_MIN
+        for i in range(len(edges) - 1):
+            lo, hi = edges[i], edges[i + 1]
+            params_b = {**params, "lo": lo, "hi": hi}
+            cnt = (await session.execute(
+                text(
+                    f"""
+                    SELECT COUNT(*) AS cnt
+                    FROM alert_events
+                    {base_where}
+                      AND EXTRACT(EPOCH FROM (finished_at - started_at)) / 60 >= :lo
+                      AND EXTRACT(EPOCH FROM (finished_at - started_at)) / 60 <  :hi
+                    """
+                ),
+                params_b,
+            )).scalar_one()
+            buckets.append(DurationBucket(range_min=lo, range_max=hi, count=int(cnt)))
+        # 240+ overflow bucket
+        params_o = {**params, "lo": edges[-1]}
+        overflow = (await session.execute(
+            text(
+                f"""
+                SELECT COUNT(*) AS cnt
+                FROM alert_events
+                {base_where}
+                  AND EXTRACT(EPOCH FROM (finished_at - started_at)) / 60 >= :lo
+                """
+            ),
+            params_o,
+        )).scalar_one()
+        buckets.append(DurationBucket(range_min=edges[-1], range_max=None, count=int(overflow)))
+
+    return DurationHistogramResponse(
+        period=period,
+        total=int(stats_row.total),
+        median_minutes=float(stats_row.median_min) if stats_row.median_min is not None else None,
+        p95_minutes=float(stats_row.p95_min) if stats_row.p95_min is not None else None,
+        buckets=buckets,
+    )
+
+
+@router.get("/stats/comparison", response_model=ComparisonResponse)
+async def get_stats_comparison() -> ComparisonResponse:
+    """today vs yesterday — totals + duration. Day boundary = UTC midnight."""
+    now = datetime.now(timezone.utc)
+    today_start = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+    yday_start = today_start - timedelta(days=1)
+
+    sql = text(
+        """
+        SELECT
+            COUNT(*)                                                                       AS cnt,
+            COALESCE(SUM(EXTRACT(EPOCH FROM (COALESCE(finished_at, NOW()) - started_at)) / 60), 0)::int
+                                                                                           AS duration_min
+        FROM alert_events
+        WHERE started_at >= :start AND started_at < :end
+        """
+    )
+
+    factory = get_session_factory()
+    async with factory() as session:
+        t_row = (await session.execute(sql, {"start": today_start, "end": today_start + timedelta(days=1)})).one()
+        y_row = (await session.execute(sql, {"start": yday_start, "end": today_start})).one()
+
+    today = ComparisonStats(
+        label="today",
+        date=str(today_start.date()),
+        total_alerts=int(t_row.cnt),
+        total_duration_minutes=int(t_row.duration_min),
+    )
+    yesterday = ComparisonStats(
+        label="yesterday",
+        date=str(yday_start.date()),
+        total_alerts=int(y_row.cnt),
+        total_duration_minutes=int(y_row.duration_min),
+    )
+
+    def delta_pct(t: int, y: int) -> float | None:
+        if y == 0:
+            return None
+        return (t - y) / y * 100.0
+
+    return ComparisonResponse(
+        today=today,
+        yesterday=yesterday,
+        alerts_delta_pct=delta_pct(today.total_alerts, yesterday.total_alerts),
+        duration_delta_pct=delta_pct(today.total_duration_minutes, yesterday.total_duration_minutes),
     )
