@@ -44,6 +44,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-deshahed}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-deshahed}
       REDIS_URL: redis://redis:6379/0
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      SENTRY_DSN: ${SENTRY_DSN:-}
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:
@@ -109,6 +110,8 @@ services:
       # `https://де-шахед.online`. Let `apps/web/src/lib/env.ts` derive it at runtime
       # from window.location. Override only if you really need a custom backend host.
       NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-}
+      NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
     volumes:
       - ../apps/web:/app
       - web_node_modules:/app/node_modules

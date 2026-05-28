@@ -1,11 +1,24 @@
 from contextlib import asynccontextmanager
 
+import sentry_sdk
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.db import dispose
 from app.routes import alerts, health, ws_alerts
+
+
+def _init_sentry() -> None:
+    settings = get_settings()
+    if not settings.sentry_dsn:
+        return
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn,
+        environment=settings.app_env,
+        traces_sample_rate=0.0,
+        send_default_pii=False,
+    )
 
 
 @asynccontextmanager
@@ -16,6 +29,7 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    _init_sentry()
     app = FastAPI(
         title="deshahed API",
         version="0.1.0",

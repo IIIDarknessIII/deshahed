@@ -14,6 +14,7 @@ class Settings(BaseSettings):
         default="http://localhost:3000,http://127.0.0.1:3000",
         description="Comma-separated allow-list for the CORS middleware.",
     )
+    sentry_dsn: str = Field(default="")
 
     @property
     def cors_origins_list(self) -> list[str]:
