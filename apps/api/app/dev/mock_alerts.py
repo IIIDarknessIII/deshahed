@@ -96,6 +96,9 @@ def _build_alert(location_uid: int, alert_type: str, started_at: str | None = No
         "alert_type": alert_type,
         "started_at": started_at or _now_iso(),
         "finished_at": None,
+        # Mock data is always at oblast/city level — parent == self.
+        "location_oblast": title,
+        "location_oblast_uid": location_uid,
     }
 
 

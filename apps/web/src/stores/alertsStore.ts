@@ -39,8 +39,10 @@ export const useAlertsStore = create<AlertsState>((set) => ({
 }));
 
 export function selectActiveTitles(state: AlertsState): Set<string> {
+  // Always match by the parent oblast title — sub-oblast alerts (raion /
+  // hromada / city) need to light up their containing oblast on the map.
   const set = new Set<string>();
-  for (const a of state.alerts.values()) set.add(a.location_title);
+  for (const a of state.alerts.values()) set.add(a.location_oblast || a.location_title);
   return set;
 }
 

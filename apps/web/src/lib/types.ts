@@ -20,6 +20,10 @@ export interface AlertView {
   alert_type: AlertType;
   started_at: string;
   finished_at: string | null;
+  /** Parent oblast — for hromada / raion / city alerts, the oblast that contains them.
+   *  For oblast-level alerts mirrors location_title. */
+  location_oblast: string;
+  location_oblast_uid: number;
 }
 
 export type WsMessage =

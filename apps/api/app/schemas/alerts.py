@@ -24,6 +24,12 @@ class AlertView(BaseModel):
     alert_type: AlertType
     started_at: datetime
     finished_at: datetime | None = None
+    # Parent oblast — required for the frontend to highlight the right region
+    # when the alert is fired at hromada / raion / city level (we don't ship
+    # sub-oblast geometry). For oblast-level alerts these mirror
+    # location_title / location_uid.
+    location_oblast: str | None = None
+    location_oblast_uid: int | None = None
 
 
 class SnapshotMessage(BaseModel):

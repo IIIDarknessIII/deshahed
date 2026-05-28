@@ -45,7 +45,12 @@ def _alert_key(a: dict) -> tuple[int, str]:
 
 
 def _normalize(a: dict) -> dict:
-    """Trim an alerts.in.ua alert object to what our WS / DB layers care about."""
+    """Trim an alerts.in.ua alert object to what our WS / DB layers care about.
+
+    Includes `location_oblast` + `location_oblast_uid` even when the alert is
+    fired at hromada / raion / city level — without this, the frontend can't
+    light up the parent oblast on the map (we have no sub-oblast geometry).
+    """
     return {
         "location_uid": int(a["location_uid"]),
         "location_title": a["location_title"],
@@ -53,6 +58,10 @@ def _normalize(a: dict) -> dict:
         "alert_type": a["alert_type"],
         "started_at": a["started_at"],
         "finished_at": a.get("finished_at"),
+        "location_oblast": a.get("location_oblast") or a["location_title"],
+        "location_oblast_uid": int(a["location_oblast_uid"])
+            if a.get("location_oblast_uid") is not None
+            else int(a["location_uid"]),
     }
 
 
