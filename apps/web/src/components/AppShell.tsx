@@ -1,6 +1,7 @@
 "use client";
 
 import { useAlertsSocket } from "@/lib/ws";
+import { useDronesSocket } from "@/lib/dronesWs";
 import { Map } from "@/components/Map";
 import { AlertsPanel } from "@/components/AlertsPanel";
 import { StatsPanel } from "@/components/StatsPanel";
@@ -9,6 +10,7 @@ import { MobileBottomNav } from "@/components/MobileBottomNav";
 
 export function AppShell() {
   useAlertsSocket();
+  useDronesSocket();
   return (
     <main className="flex h-screen w-screen flex-col overflow-hidden md:flex-row">
       <AlertsPanel />

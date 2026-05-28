@@ -3,12 +3,19 @@
 import { useEffect, useRef } from "react";
 import maplibregl, { type Map as MapLibreMap } from "maplibre-gl";
 import { useAlertsStore, selectActiveTitles } from "@/stores/alertsStore";
+import { useDronesStore } from "@/stores/dronesStore";
 import { useUiStore } from "@/stores/uiStore";
 import { UID_BY_TITLE } from "@/lib/locations";
+import type { DroneEvent } from "@/lib/types";
 
 const SOURCE_ID = "oblasts";
 const FILL_LAYER = "oblasts-fill";
 const LINE_LAYER = "oblasts-line";
+
+const DRONES_SOURCE = "drones";
+const DRONES_POINT_LAYER = "drones-point";
+const DRONE_TRACKS_SOURCE = "drone-tracks";
+const DRONE_TRACKS_LAYER = "drone-tracks";
 
 const STYLE: maplibregl.StyleSpecification = {
   version: 8,
@@ -93,6 +100,58 @@ export function Map() {
         },
       });
 
+      // Drones — direction line (under points) and the point itself.
+      map.addSource(DRONE_TRACKS_SOURCE, {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+      });
+      map.addSource(DRONES_SOURCE, {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+      });
+
+      map.addLayer({
+        id: DRONE_TRACKS_LAYER,
+        type: "line",
+        source: DRONE_TRACKS_SOURCE,
+        paint: {
+          "line-color": [
+            "match",
+            ["get", "event_type"],
+            "shahed", "#fb923c",
+            "missile", "#dc2626",
+            "kab", "#a855f7",
+            "aviation", "#38bdf8",
+            "#9ca3af",
+          ],
+          "line-width": 1.2,
+          "line-opacity": 0.7,
+          "line-dasharray": [2, 1.5],
+        },
+      });
+      map.addLayer({
+        id: DRONES_POINT_LAYER,
+        type: "circle",
+        source: DRONES_SOURCE,
+        paint: {
+          "circle-radius": 7,
+          "circle-color": [
+            "match",
+            ["get", "event_type"],
+            "shahed", "#fb923c",
+            "missile", "#dc2626",
+            "kab", "#a855f7",
+            "aviation", "#38bdf8",
+            "#9ca3af",
+          ],
+          "circle-stroke-color": "#0a0a0b",
+          "circle-stroke-width": 1.5,
+          "circle-opacity": 0.95,
+        },
+      });
+
+      applyDroneState();
+
       // Hover popup with region name + active-alert duration.
       const popup = new maplibregl.Popup({
         closeButton: false,
@@ -170,11 +229,54 @@ export function Map() {
       }
     };
 
+    const applyDroneState = () => {
+      const m = mapRef.current;
+      if (!m) return;
+      const src = m.getSource(DRONES_SOURCE) as
+        | maplibregl.GeoJSONSource
+        | undefined;
+      const tracksSrc = m.getSource(DRONE_TRACKS_SOURCE) as
+        | maplibregl.GeoJSONSource
+        | undefined;
+      if (!src || !tracksSrc) return;
+      const drones = Array.from(useDronesStore.getState().drones.values());
+      src.setData({
+        type: "FeatureCollection",
+        features: drones.map(
+          (d: DroneEvent): GeoJSON.Feature => ({
+            type: "Feature",
+            geometry: { type: "Point", coordinates: [d.location_lon, d.location_lat] },
+            properties: { id: d.id, event_type: d.event_type, confidence: d.confidence },
+          }),
+        ),
+      });
+      tracksSrc.setData({
+        type: "FeatureCollection",
+        features: drones
+          .filter((d) => d.direction_lat !== null && d.direction_lon !== null)
+          .map(
+            (d): GeoJSON.Feature => ({
+              type: "Feature",
+              geometry: {
+                type: "LineString",
+                coordinates: [
+                  [d.location_lon, d.location_lat],
+                  [d.direction_lon as number, d.direction_lat as number],
+                ],
+              },
+              properties: { id: d.id, event_type: d.event_type },
+            }),
+          ),
+      });
+    };
+
     const unsubscribe = useAlertsStore.subscribe(applyAlertState);
+    const unsubscribeDrones = useDronesStore.subscribe(applyDroneState);
 
     return () => {
       cancelled = true;
       unsubscribe();
+      unsubscribeDrones();
       map.remove();
       mapRef.current = null;
     };
