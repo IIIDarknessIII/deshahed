@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useAlertsStore } from "@/stores/alertsStore";
 import { ENV } from "@/lib/env";
+import { notifyAlertStarted } from "@/lib/sound";
 import type { WsMessage } from "@/lib/types";
 
 const RECONNECT_MIN_MS = 1_000;
@@ -14,6 +15,7 @@ function dispatch(msg: WsMessage) {
       return;
     case "alert_started":
       s.upsert(msg.alert);
+      notifyAlertStarted(msg.alert.location_oblast || msg.alert.location_title);
       return;
     case "alert_ended":
       s.remove(msg.location_uid, msg.alert_type);

@@ -7,6 +7,7 @@ import { useUiStore, type HeatmapPeriod } from "@/stores/uiStore";
 import { formatDuration } from "@/lib/format";
 import { PushSubscribe } from "@/components/PushSubscribe";
 import { AlertLegend } from "@/components/AlertLegend";
+import { SoundToggle } from "@/components/SoundToggle";
 
 const HEATMAP_PERIODS: { value: HeatmapPeriod; label: string }[] = [
   { value: "day", label: "Доба" },
@@ -84,8 +85,9 @@ export function StatsPanel() {
         />
       </div>
 
-      <div className="border-t border-border px-4 py-3">
+      <div className="border-t border-border px-4 py-3 space-y-2">
         <PushSubscribe />
+        <SoundToggle />
       </div>
 
       <div className="border-t border-border px-4 py-3">
