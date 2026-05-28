@@ -1,9 +1,15 @@
 "use client";
 
-import { X } from "lucide-react";
+import { Flame, X } from "lucide-react";
 import { useStatsSummary } from "@/hooks/useStats";
-import { useUiStore } from "@/stores/uiStore";
+import { useUiStore, type HeatmapPeriod } from "@/stores/uiStore";
 import { formatDuration } from "@/lib/format";
+
+const HEATMAP_PERIODS: { value: HeatmapPeriod; label: string }[] = [
+  { value: "day", label: "Доба" },
+  { value: "week", label: "Тиждень" },
+  { value: "month", label: "Місяць" },
+];
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
@@ -22,6 +28,10 @@ export function StatsPanel() {
   const { data, isLoading, isError } = useStatsSummary("day");
   const mobileSheet = useUiStore((s) => s.mobileSheet);
   const setMobileSheet = useUiStore((s) => s.setMobileSheet);
+  const heatmapOn = useUiStore((s) => s.heatmapOn);
+  const setHeatmapOn = useUiStore((s) => s.setHeatmapOn);
+  const heatmapPeriod = useUiStore((s) => s.heatmapPeriod);
+  const setHeatmapPeriod = useUiStore((s) => s.setHeatmapPeriod);
   const isMobileOpen = mobileSheet === "stats";
 
   const totalAlerts = data?.total_alerts ?? 0;
@@ -58,6 +68,47 @@ export function StatsPanel() {
           label="Сумарний час"
           value={formatDuration(totalDurationMin * 60_000)}
         />
+      </div>
+
+      <div className="border-t border-border px-4 py-3">
+        <button
+          type="button"
+          onClick={() => setHeatmapOn(!heatmapOn)}
+          className={
+            "flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm transition " +
+            (heatmapOn
+              ? "border-alert-active bg-alert-active/10 text-alert-active"
+              : "border-border text-zinc-300 hover:border-zinc-600")
+          }
+          aria-pressed={heatmapOn}
+        >
+          <span className="flex items-center gap-2">
+            <Flame size={14} />
+            Теплова карта БпЛА
+          </span>
+          <span className="text-[10px] uppercase tracking-wide">
+            {heatmapOn ? "увімк." : "вимк."}
+          </span>
+        </button>
+        {heatmapOn && (
+          <div className="mt-2 flex gap-1.5">
+            {HEATMAP_PERIODS.map((p) => (
+              <button
+                key={p.value}
+                type="button"
+                onClick={() => setHeatmapPeriod(p.value)}
+                className={
+                  "flex-1 rounded px-2 py-1 text-[11px] " +
+                  (heatmapPeriod === p.value
+                    ? "bg-zinc-100 text-zinc-900"
+                    : "border border-border text-zinc-300 hover:border-zinc-600")
+                }
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="border-t border-border px-4 py-3">

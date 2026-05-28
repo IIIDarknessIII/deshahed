@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import maplibregl, { type Map as MapLibreMap } from "maplibre-gl";
 import { useAlertsStore, selectActiveTitles } from "@/stores/alertsStore";
 import { useDronesStore } from "@/stores/dronesStore";
@@ -8,6 +8,7 @@ import { useTracksStore } from "@/stores/tracksStore";
 import { useUiStore } from "@/stores/uiStore";
 import { UID_BY_TITLE } from "@/lib/locations";
 import type { DroneEvent, DroneTrack } from "@/lib/types";
+import { HeatmapController } from "@/components/HeatmapLayer";
 
 const SOURCE_ID = "oblasts";
 const FILL_LAYER = "oblasts-fill";
@@ -21,6 +22,9 @@ const DRONE_TRACKS_LAYER = "drone-tracks";
 const TRAJECTORIES_SOURCE = "trajectories";
 const TRAJECTORIES_LINE_LAYER = "trajectories-line";
 const TRAJECTORIES_HEAD_LAYER = "trajectories-head";
+
+const HEATMAP_SOURCE = "heatmap";
+const HEATMAP_FILL_LAYER = "heatmap-fill";
 
 const STYLE: maplibregl.StyleSpecification = {
   version: 8,
@@ -38,6 +42,37 @@ export function Map() {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const geojsonRef = useRef<GeoJSON.FeatureCollection | null>(null);
+  const [maxWeight, setMaxWeight] = useState(1);
+
+  const setHeatmapData = useCallback((fc: GeoJSON.FeatureCollection) => {
+    const m = mapRef.current;
+    if (!m) return;
+    const src = m.getSource(HEATMAP_SOURCE) as maplibregl.GeoJSONSource | undefined;
+    src?.setData(fc);
+  }, []);
+
+  const setHeatmapVisibility = useCallback((visible: boolean) => {
+    const m = mapRef.current;
+    if (!m) return;
+    if (!m.getLayer(HEATMAP_FILL_LAYER)) return;
+    m.setLayoutProperty(HEATMAP_FILL_LAYER, "visibility", visible ? "visible" : "none");
+  }, []);
+
+  // Re-paint the choropleth scale when max_weight changes — keeps the
+  // color stretch meaningful as the dataset grows or shrinks.
+  useEffect(() => {
+    const m = mapRef.current;
+    if (!m || !m.getLayer(HEATMAP_FILL_LAYER)) return;
+    const max = Math.max(maxWeight, 1);
+    m.setPaintProperty(HEATMAP_FILL_LAYER, "fill-color", [
+      "interpolate",
+      ["linear"],
+      ["get", "weight"],
+      0, "rgba(253, 224, 71, 0.15)",        // yellow-200
+      max / 2, "rgba(249, 115, 22, 0.45)",  // orange-500
+      max, "rgba(220, 38, 38, 0.75)",       // red-600
+    ]);
+  }, [maxWeight]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -104,6 +139,31 @@ export function Map() {
           "line-width": 1,
         },
       });
+
+      // Heatmap — installed empty + invisible at startup; the HeatmapController
+      // patches data + visibility based on uiStore.
+      map.addSource(HEATMAP_SOURCE, {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+      });
+      map.addLayer(
+        {
+          id: HEATMAP_FILL_LAYER,
+          type: "fill",
+          source: HEATMAP_SOURCE,
+          layout: { visibility: "none" },
+          paint: {
+            "fill-color": [
+              "interpolate", ["linear"], ["get", "weight"],
+              0, "rgba(253, 224, 71, 0.15)",
+              0.5, "rgba(249, 115, 22, 0.45)",
+              1, "rgba(220, 38, 38, 0.75)",
+            ],
+            "fill-outline-color": "rgba(0,0,0,0)",
+          },
+        },
+        LINE_LAYER,
+      );
 
       // Drones — direction line (under points) and the point itself.
       map.addSource(DRONE_TRACKS_SOURCE, {
@@ -379,5 +439,14 @@ export function Map() {
     };
   }, []);
 
-  return <div ref={containerRef} className="h-full w-full" />;
+  return (
+    <>
+      <div ref={containerRef} className="h-full w-full" />
+      <HeatmapController
+        setData={setHeatmapData}
+        setVisibility={setHeatmapVisibility}
+        setMaxWeight={setMaxWeight}
+      />
+    </>
+  );
 }

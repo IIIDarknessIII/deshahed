@@ -43,9 +43,21 @@ async function get<T>(path: string): Promise<T> {
   return (await res.json()) as T;
 }
 
+export type HeatmapType = "all" | "shahed" | "missile" | "kab" | "aviation";
+
+export interface HeatmapResponse {
+  period: Period;
+  event_type: HeatmapType;
+  max_weight: number;
+  computed_at: string;
+  geojson: GeoJSON.FeatureCollection;
+}
+
 export const api = {
   statsSummary: (period: Period) =>
     get<SummaryResponse>(`/api/v1/stats/summary?period=${period}`),
   alertsHistory: (location_uid: number, period: Period) =>
     get<HistoryResponse>(`/api/v1/alerts/history?location_uid=${location_uid}&period=${period}`),
+  heatmap: (period: Period, type: HeatmapType) =>
+    get<HeatmapResponse>(`/api/v1/heatmap?period=${period}&type=${type}`),
 };
