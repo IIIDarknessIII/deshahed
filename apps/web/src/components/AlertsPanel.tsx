@@ -5,6 +5,7 @@ import { useShallow } from "zustand/react/shallow";
 import { useAlertsStore, selectAlertsList } from "@/stores/alertsStore";
 import { useUiStore } from "@/stores/uiStore";
 import { formatDuration } from "@/lib/format";
+import { alertTypeLabel } from "@/lib/labels";
 
 export function AlertsPanel() {
   const connected = useAlertsStore((s) => s.connected);
@@ -74,7 +75,7 @@ export function AlertsPanel() {
                   {formatDuration(now - +new Date(a.started_at))}
                 </div>
               </div>
-              <div className="mt-0.5 text-xs text-zinc-500">{a.alert_type}</div>
+              <div className="mt-0.5 text-xs text-zinc-400">{alertTypeLabel(a.alert_type)}</div>
             </li>
           ))
         )}

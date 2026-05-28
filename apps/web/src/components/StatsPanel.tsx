@@ -44,13 +44,13 @@ export function StatsPanel() {
   return (
     <aside
       className={
-        "flex flex-col border-border bg-bg/95 backdrop-blur transition-transform duration-300 " +
+        "flex flex-col overflow-hidden border-border bg-bg/95 backdrop-blur transition-transform duration-300 " +
         "md:relative md:h-full md:w-80 md:shrink-0 md:border-l md:translate-y-0 " +
         "fixed inset-x-0 bottom-0 z-40 h-[70vh] rounded-t-xl border " +
         (isMobileOpen ? "translate-y-0" : "translate-y-full md:translate-y-0")
       }
     >
-      <header className="flex items-center justify-between border-b border-border px-4 py-3">
+      <header className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
         <div>
           <div className="text-base font-semibold text-zinc-100">Статистика</div>
           <div className="text-xs text-zinc-500">за добу</div>
@@ -75,6 +75,7 @@ export function StatsPanel() {
         </div>
       </header>
 
+      <div className="flex-1 overflow-y-auto">
       <div className="space-y-2.5 px-4 py-3">
         <StatCard label="Всього тривог" value={String(totalAlerts)} />
         <StatCard
@@ -163,6 +164,7 @@ export function StatsPanel() {
             </li>
           ))}
         </ul>
+      </div>
       </div>
     </aside>
   );
