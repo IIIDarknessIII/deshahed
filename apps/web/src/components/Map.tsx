@@ -13,6 +13,7 @@ import { HeatmapController } from "@/components/HeatmapLayer";
 const SOURCE_ID = "oblasts";
 const FILL_LAYER = "oblasts-fill";
 const LINE_LAYER = "oblasts-line";
+const LABEL_LAYER = "oblasts-label";
 
 const DRONES_SOURCE = "drones";
 const DRONES_POINT_LAYER = "drones-point";
@@ -69,8 +70,11 @@ async function registerDroneIcons(map: MapLibreMap): Promise<void> {
   }
 }
 
+// MapLibre demo glyphs CDN — supports Cyrillic via "Noto Sans Regular".
+// Used only for oblast labels; map tiles are not from this host.
 const STYLE: maplibregl.StyleSpecification = {
   version: 8,
+  glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
   sources: {},
   layers: [
     {
@@ -188,6 +192,35 @@ export function Map() {
             ["==", ["get", "subscribed"], true], 2.2,
             1,
           ],
+        },
+      });
+
+      // Oblast names painted at the polygon's pole-of-inaccessibility.
+      // Cyrillic glyphs come from the demotiles CDN declared on STYLE.glyphs.
+      map.addLayer({
+        id: LABEL_LAYER,
+        type: "symbol",
+        source: SOURCE_ID,
+        layout: {
+          "text-field": ["get", "name_uk"],
+          "text-font": ["Noto Sans Regular"],
+          "text-size": [
+            "interpolate", ["linear"], ["zoom"],
+            4, 9,
+            6, 11,
+            8, 13,
+          ],
+          "text-anchor": "center",
+          "text-allow-overlap": false,
+          "text-padding": 3,
+          "text-max-width": 8,
+          "symbol-placement": "point",
+        },
+        paint: {
+          "text-color": "#e4e4e7",
+          "text-halo-color": "#0a0a0b",
+          "text-halo-width": 1.4,
+          "text-halo-blur": 0.4,
         },
       });
 
