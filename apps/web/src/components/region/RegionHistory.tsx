@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { useHistory } from "@/hooks/useHistory";
+import { useHistoryByOblast } from "@/hooks/useHistory";
 import type { Period } from "@/lib/api";
 import { formatDuration } from "@/lib/format";
 
@@ -54,9 +54,17 @@ function bucketByDay(items: { started_at: string; duration_seconds: number }[], 
   return Array.from(buckets.values());
 }
 
-export function RegionHistory({ regionUid, regionTitle }: { regionUid: number; regionTitle: string }) {
+export function RegionHistory({
+  regionUid,
+  regionTitle,
+  oblastFullName,
+}: {
+  regionUid: number;
+  regionTitle: string;
+  oblastFullName: string;
+}) {
   const [period, setPeriod] = useState<Period>("week");
-  const { data, isLoading, isError } = useHistory(regionUid, period);
+  const { data, isLoading, isError } = useHistoryByOblast(oblastFullName, period);
 
   const buckets = data ? bucketByDay(data.items, period) : [];
   const total = data?.items.length ?? 0;

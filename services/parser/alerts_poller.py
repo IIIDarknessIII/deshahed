@@ -107,6 +107,8 @@ async def _persist_and_publish(started: list[dict], ended: list[dict], raw_by_ke
                     alert_type=a["alert_type"],
                     started_at=_parse_ts(a["started_at"]),
                     finished_at=None,
+                    location_oblast=a.get("location_oblast", a["location_title"]),
+                    location_oblast_uid=int(a.get("location_oblast_uid", a["location_uid"])),
                     raw_payload=raw_by_key[_alert_key(a)],
                 )
             )

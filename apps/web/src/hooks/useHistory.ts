@@ -9,3 +9,12 @@ export function useHistory(locationUid: number | null, period: Period) {
     staleTime: 30_000,
   });
 }
+
+export function useHistoryByOblast(oblast: string | null, period: Period) {
+  return useQuery({
+    queryKey: ["alerts", "history-oblast", oblast, period],
+    queryFn: () => api.alertsHistoryByOblast(oblast!, period),
+    enabled: !!oblast,
+    staleTime: 30_000,
+  });
+}

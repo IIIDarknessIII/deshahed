@@ -20,6 +20,12 @@ class AlertEvent(Base):
     finished_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # Parent-oblast columns — required for the /stats/summary roll-up and the
+    # push dispatcher's region filter (see alerts_poller._normalize for how
+    # they're filled). For oblast-level alerts these mirror location_title /
+    # location_uid.
+    location_oblast: Mapped[str] = mapped_column(Text, nullable=False)
+    location_oblast_uid: Mapped[int] = mapped_column(Integer, nullable=False)
     raw_payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
