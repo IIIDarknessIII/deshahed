@@ -8,3 +8,4 @@ alembic==1.14.0
 redis==5.2.1
 httpx==0.28.1
 sentry-sdk[fastapi]==2.19.2
+geoalchemy2==0.16.0
