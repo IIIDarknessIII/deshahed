@@ -46,6 +46,7 @@ import pymorphy3
 
 from .gazetteer import load_gazetteer
 from .local_extractor import LocalExtraction, LocalExtractor
+from .track_assembler import assemble as track_assemble
 
 log = logging.getLogger("llm_extractor")
 
@@ -355,22 +356,39 @@ async def _persist_and_publish(
             # worker / retry — idempotent no-op.
             return
 
-        view = DroneEventView(
-            id=new_id,
-            event_type=event.type,
-            location_text=event.location,
-            direction_text=event.direction,
-            location_lat=loc.lat,
-            location_lon=loc.lon,
-            direction_lat=direction.lat if direction and direction.found else None,
-            direction_lon=direction.lon if direction and direction.found else None,
-            confidence=event.confidence,
-            source_channel=source_channel,
-            detected_at=detected_at,
-            expires_at=expires_at,
-        )
-        msg = DroneAppearedMessage(drone=view)
-        await redis.publish(PUBSUB_CHANNEL, msg.model_dump_json())
+    # Phase 3 track assembly — its own transaction so a failure here doesn't
+    # roll back the drone_events row we just persisted.
+    async with factory() as track_session:
+        try:
+            await track_assemble(
+                track_session,
+                event_type=event.type,
+                lat=loc.lat,
+                lon=loc.lon,
+                detected_at=detected_at,
+                confidence=event.confidence,
+            )
+            await track_session.commit()
+        except Exception:
+            await track_session.rollback()
+            log.exception("track_assemble failed for event #%s — event kept, track skipped", new_id)
+
+    view = DroneEventView(
+        id=new_id,
+        event_type=event.type,
+        location_text=event.location,
+        direction_text=event.direction,
+        location_lat=loc.lat,
+        location_lon=loc.lon,
+        direction_lat=direction.lat if direction and direction.found else None,
+        direction_lon=direction.lon if direction and direction.found else None,
+        confidence=event.confidence,
+        source_channel=source_channel,
+        detected_at=detected_at,
+        expires_at=expires_at,
+    )
+    msg = DroneAppearedMessage(drone=view)
+    await redis.publish(PUBSUB_CHANNEL, msg.model_dump_json())
 
 
 async def _handle_message(

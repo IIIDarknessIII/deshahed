@@ -1,12 +1,34 @@
+import asyncio
+import logging
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
 import sentry_sdk
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 from app.config import get_settings
-from app.db import dispose
+from app.db import dispose, get_session_factory
 from app.routes import alerts, drones, health, ws_alerts
+
+log = logging.getLogger("uvicorn.error").getChild("lifespan")
+
+# Phase 3 — close drone_tracks idle > 20 min so the WS/REST surface only
+# shows live trajectories. Lives in the api process (not the parser) so the
+# work happens even when the extractor is down.
+STALE_TRACKS_SWEEP_SEC = 60
+STALE_TRACKS_CUTOFF_MIN = 20
+
+_CLOSE_STALE_SQL = text(
+    """
+    UPDATE drone_tracks
+    SET is_active = FALSE
+    WHERE is_active = TRUE
+      AND last_seen_at < (NOW() - make_interval(mins => :cutoff_min))
+    RETURNING id
+    """
+)
 
 
 def _init_sentry() -> None:
@@ -21,10 +43,39 @@ def _init_sentry() -> None:
     )
 
 
+async def _close_stale_tracks_loop(stop: asyncio.Event) -> None:
+    factory = get_session_factory()
+    while not stop.is_set():
+        try:
+            async with factory() as session:
+                rows = (await session.execute(
+                    _CLOSE_STALE_SQL, {"cutoff_min": STALE_TRACKS_CUTOFF_MIN}
+                )).all()
+                if rows:
+                    await session.commit()
+                    log.info("closed %d stale drone tracks", len(rows))
+        except Exception:
+            log.exception("close-stale-tracks sweep failed")
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=STALE_TRACKS_SWEEP_SEC)
+        except asyncio.TimeoutError:
+            continue
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    yield
-    await dispose()
+    stop = asyncio.Event()
+    sweep_task = asyncio.create_task(_close_stale_tracks_loop(stop))
+    try:
+        yield
+    finally:
+        stop.set()
+        sweep_task.cancel()
+        try:
+            await sweep_task
+        except (asyncio.CancelledError, Exception):
+            pass
+        await dispose()
 
 
 def create_app() -> FastAPI:
