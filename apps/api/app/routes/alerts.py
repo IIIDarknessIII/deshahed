@@ -126,29 +126,31 @@ async def get_stats_summary(period: Period = Query("week")) -> SummaryResponse:
         func.coalesce(AlertEvent.finished_at, func.now()) - AlertEvent.started_at,
     )
 
-    # Group by the PARENT oblast — sub-oblast alerts (~94% of feed) would
-    # otherwise drown out actual oblast-level rows in the top-10 widget.
+    # Group by the PARENT oblast TITLE only — alerts.in.ua reuses the
+    # sub-region's location_uid in location_oblast_uid (verified), so the UID
+    # is not a stable group key. The title string is canonical and unique.
     factory = get_session_factory()
     async with factory() as session:
         per_oblast_stmt = select(
-            AlertEvent.location_oblast_uid.label("uid"),
             AlertEvent.location_oblast.label("title"),
             func.count().label("cnt"),
             func.coalesce(func.sum(duration_expr), 0).label("dur_sec"),
+            func.min(AlertEvent.location_oblast_uid).label("any_uid"),
         )
         if start is not None:
             per_oblast_stmt = per_oblast_stmt.where(AlertEvent.started_at >= start)
         per_oblast_stmt = (
-            per_oblast_stmt.group_by(
-                AlertEvent.location_oblast_uid, AlertEvent.location_oblast
-            )
+            per_oblast_stmt.group_by(AlertEvent.location_oblast)
             .order_by(func.sum(duration_expr).desc().nullslast())
         )
         rows = (await session.execute(per_oblast_stmt)).all()
 
     by_oblast = [
         OblastStat(
-            location_uid=int(r.uid),
+            # OblastStat carries an integer uid; expose `any_uid` (one of the
+            # raw row UIDs in this group). It's only used by /history for
+            # navigation; per-oblast drill-down should use the `oblast=` query.
+            location_uid=int(r.any_uid or 0),
             location_title=r.title,
             count=int(r.cnt),
             duration_minutes=int((r.dur_sec or 0) // 60),
