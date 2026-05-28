@@ -113,6 +113,7 @@ services:
       context: ../services/parser
     image: deshahed-parser:dev
     container_name: deshahed-tg-listener
+    command: ["python", "-m", "parser.tg_listener"]
     environment:
       APP_ENV: ${APP_ENV:-dev}
       REDIS_URL: redis://redis:6379/0
@@ -129,7 +130,29 @@ services:
       - internal
     restart: unless-stopped
     profiles: ["with-tg"]
-    command: ["python", "-m", "parser.tg_listener"]
+    healthcheck:
+      test: ["NONE"]
+
+  aviation_watcher:
+    build:
+      context: ../services/parser
+    image: deshahed-parser:dev
+    container_name: deshahed-aviation-watcher
+    command: ["python", "-m", "parser.aviation_watcher"]
+    environment:
+      APP_ENV: ${APP_ENV:-dev}
+      # The watcher only touches Redis, but app.config.Settings still
+      # requires DATABASE_URL at import time. Pass the same value so the
+      # shared module loads cleanly.
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-deshahed}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-deshahed}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - internal
+    restart: unless-stopped
+    profiles: ["with-tg"]
     healthcheck:
       test: ["NONE"]
 

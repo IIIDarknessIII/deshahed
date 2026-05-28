@@ -8,6 +8,7 @@ import { AlertsPanel } from "@/components/AlertsPanel";
 import { StatsPanel } from "@/components/StatsPanel";
 import { HistoryModal } from "@/components/HistoryModal";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
+import { AviationBanner } from "@/components/AviationBanner";
 
 export function AppShell() {
   useAlertsSocket();
@@ -18,6 +19,7 @@ export function AppShell() {
       <AlertsPanel />
       <div className="relative min-h-0 w-full flex-1">
         <Map />
+        <AviationBanner />
       </div>
       <StatsPanel />
       <MobileBottomNav />
