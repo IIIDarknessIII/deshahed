@@ -96,6 +96,10 @@ services:
       - internal
     restart: unless-stopped
     profiles: ["with-poller"]
+    # The parser image inherits api's HEALTHCHECK (curl :8000), but this service
+    # isn't uvicorn — disable so it doesn't show "unhealthy".
+    healthcheck:
+      test: ["NONE"]
 
   tg_listener:
     build:
@@ -119,6 +123,8 @@ services:
     restart: unless-stopped
     profiles: ["with-tg"]
     command: ["python", "-m", "parser.tg_listener"]
+    healthcheck:
+      test: ["NONE"]
 
   llm_extractor:
     build:
@@ -140,6 +146,8 @@ services:
     restart: unless-stopped
     profiles: ["with-extractor"]
     command: ["python", "-m", "parser.llm_extractor"]
+    healthcheck:
+      test: ["NONE"]
 
   web:
     build:
