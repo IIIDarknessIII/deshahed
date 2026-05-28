@@ -3,6 +3,8 @@
 import { useEffect, useRef } from "react";
 import maplibregl, { type Map as MapLibreMap } from "maplibre-gl";
 import { useAlertsStore, selectActiveTitles } from "@/stores/alertsStore";
+import { useUiStore } from "@/stores/uiStore";
+import { UID_BY_TITLE } from "@/lib/locations";
 
 const SOURCE_ID = "oblasts";
 const FILL_LAYER = "oblasts-fill";
@@ -89,6 +91,58 @@ export function Map() {
           "line-color": "#27272a",
           "line-width": 1,
         },
+      });
+
+      // Hover popup with region name + active-alert duration.
+      const popup = new maplibregl.Popup({
+        closeButton: false,
+        closeOnClick: false,
+        className: "deshahed-popup",
+        offset: 8,
+      });
+
+      map.on("mousemove", FILL_LAYER, (e) => {
+        if (cancelled || !e.features || e.features.length === 0) return;
+        map.getCanvas().style.cursor = "pointer";
+        const f = e.features[0];
+        const title = (f.properties as { full_name_uk?: string } | null)?.full_name_uk ?? "";
+        const titles = selectActiveTitles(useAlertsStore.getState());
+        const isActive = title && titles.has(title);
+        let durationLabel = "";
+        if (isActive) {
+          for (const a of useAlertsStore.getState().alerts.values()) {
+            if (a.location_title === title) {
+              const ms = Date.now() - +new Date(a.started_at);
+              const min = Math.max(0, Math.floor(ms / 60_000));
+              durationLabel = min > 0 ? `${min} хв` : "щойно";
+              break;
+            }
+          }
+        }
+        const html = `
+          <div class="px-2 py-1.5">
+            <div class="text-[12px] font-medium text-zinc-100">${title}</div>
+            ${
+              isActive
+                ? `<div class="mt-0.5 text-[11px] text-red-400">Тривога · ${durationLabel}</div>`
+                : `<div class="mt-0.5 text-[11px] text-zinc-500">Без тривоги</div>`
+            }
+          </div>
+        `;
+        popup.setLngLat(e.lngLat).setHTML(html).addTo(map);
+      });
+
+      map.on("mouseleave", FILL_LAYER, () => {
+        map.getCanvas().style.cursor = "";
+        popup.remove();
+      });
+
+      map.on("click", FILL_LAYER, (e) => {
+        if (cancelled || !e.features || e.features.length === 0) return;
+        const f = e.features[0];
+        const title = (f.properties as { full_name_uk?: string } | null)?.full_name_uk ?? "";
+        const uid = UID_BY_TITLE[title];
+        if (uid !== undefined) useUiStore.getState().selectLocation(uid);
       });
 
       // Initial paint from current store state.

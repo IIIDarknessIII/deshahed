@@ -24,3 +24,17 @@ main {
 .maplibregl-canvas:focus {
   outline: none;
 }
+
+.deshahed-popup .maplibregl-popup-content {
+  background: #0a0a0b;
+  color: #e5e7eb;
+  border: 1px solid #27272a;
+  border-radius: 6px;
+  padding: 0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+}
+
+.deshahed-popup .maplibregl-popup-tip {
+  border-top-color: #27272a;
+  border-bottom-color: #27272a;
+}

@@ -4,6 +4,7 @@ import { useAlertsSocket } from "@/lib/ws";
 import { Map } from "@/components/Map";
 import { AlertsPanel } from "@/components/AlertsPanel";
 import { StatsPanel } from "@/components/StatsPanel";
+import { HistoryModal } from "@/components/HistoryModal";
 
 export function AppShell() {
   useAlertsSocket();
@@ -14,6 +15,7 @@ export function AppShell() {
         <Map />
       </div>
       <StatsPanel />
+      <HistoryModal />
     </main>
   );
 }
