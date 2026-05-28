@@ -15,7 +15,8 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.db import get_redis
 
-log = logging.getLogger(__name__)
+# Use uvicorn's logger so messages actually surface in `docker logs`.
+log = logging.getLogger("uvicorn.error").getChild("ws_alerts")
 
 router = APIRouter(prefix="/api/v1/ws", tags=["ws"])
 
@@ -37,13 +38,20 @@ async def _load_snapshot() -> list[dict]:
 
 @router.websocket("/alerts")
 async def ws_alerts(ws: WebSocket) -> None:
+    client = f"{ws.client.host}:{ws.client.port}" if ws.client else "?"
+    ua = ws.headers.get("user-agent", "?")[:80]
+    origin = ws.headers.get("origin", "?")
+    log.info("ws_alerts: incoming client=%s origin=%s ua=%s", client, origin, ua)
+
     await ws.accept()
+    log.info("ws_alerts: accepted client=%s", client)
 
     pubsub = get_redis().pubsub()
     forward_task: asyncio.Task[None] | None = None
     try:
         snapshot = await _load_snapshot()
         await ws.send_json({"type": "snapshot", "alerts": snapshot})
+        log.info("ws_alerts: snapshot sent client=%s (%d alerts)", client, len(snapshot))
 
         await pubsub.subscribe(REDIS_CHANNEL_UPDATES)
 
@@ -67,10 +75,10 @@ async def ws_alerts(ws: WebSocket) -> None:
         while True:
             await ws.receive_text()
 
-    except WebSocketDisconnect:
-        pass
+    except WebSocketDisconnect as e:
+        log.info("ws_alerts: client disconnected client=%s code=%s", client, getattr(e, "code", "?"))
     except Exception:
-        log.exception("ws_alerts unexpected error")
+        log.exception("ws_alerts unexpected error client=%s", client)
     finally:
         if forward_task is not None:
             forward_task.cancel()
