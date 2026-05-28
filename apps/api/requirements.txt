@@ -11,3 +11,4 @@ sentry-sdk[fastapi]==2.19.2
 geoalchemy2==0.16.0
 shapely==2.0.6
 openai==1.57.0
+telethon==1.38.1

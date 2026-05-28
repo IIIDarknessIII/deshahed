@@ -97,6 +97,29 @@ services:
     restart: unless-stopped
     profiles: ["with-poller"]
 
+  tg_listener:
+    build:
+      context: ../services/parser
+    image: deshahed-parser:dev
+    container_name: deshahed-tg-listener
+    environment:
+      APP_ENV: ${APP_ENV:-dev}
+      REDIS_URL: redis://redis:6379/0
+      TELEGRAM_API_ID: ${TELEGRAM_API_ID:-}
+      TELEGRAM_API_HASH: ${TELEGRAM_API_HASH:-}
+      TG_CHANNELS: ${TG_CHANNELS:-}
+      TG_SESSION_DIR: /sessions
+    volumes:
+      - tg_session:/sessions
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - internal
+    restart: unless-stopped
+    profiles: ["with-tg"]
+    command: ["python", "-m", "parser.tg_listener"]
+
   llm_extractor:
     build:
       context: ../services/parser
@@ -150,6 +173,7 @@ volumes:
   redis_data:
   web_node_modules:
   web_next_cache:
+  tg_session:
 
 networks:
   internal:
