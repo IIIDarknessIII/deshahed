@@ -37,6 +37,40 @@ log = logging.getLogger("seed_settlements")
 
 GEONAMES_URL = "https://download.geonames.org/export/dump/UA.zip"
 
+# Some PPLA/PPLC rows in the GeoNames basic dump lack:
+#   (a) an admin1_code (because the city IS the admin1 — Kyiv, Sevastopol),
+#   (b) a Cyrillic alternateName (the basic dump trims them aggressively).
+# Inject these by geonameid so we don't lose every oblast capital + Kyiv.
+GEONAME_OVERRIDES: dict[int, dict] = {
+    703448: dict(name="Київ", oblast="м. Київ", type="city"),
+    694423: dict(name="Севастополь", oblast="м. Севастополь", type="city"),
+    706483: dict(name="Харків", oblast="Харківська область", type="city"),
+    702550: dict(name="Львів", oblast="Львівська область", type="city"),
+    698740: dict(name="Одеса", oblast="Одеська область", type="city"),
+    709930: dict(name="Дніпро", oblast="Дніпропетровська область", type="city"),
+    709717: dict(name="Донецьк", oblast="Донецька область", type="city"),
+    687700: dict(name="Запоріжжя", oblast="Запорізька область", type="city"),
+    706482: dict(name="Кривий Ріг", oblast="Дніпропетровська область", type="city"),
+    702658: dict(name="Луганськ", oblast="Луганська область", type="city"),
+    700569: dict(name="Миколаїв", oblast="Миколаївська область", type="city"),
+    696643: dict(name="Полтава", oblast="Полтавська область", type="city"),
+    707471: dict(name="Івано-Франківськ", oblast="Івано-Франківська область", type="city"),
+    686967: dict(name="Житомир", oblast="Житомирська область", type="city"),
+    692194: dict(name="Суми", oblast="Сумська область", type="city"),
+    690548: dict(name="Ужгород", oblast="Закарпатська область", type="city"),
+    691650: dict(name="Тернопіль", oblast="Тернопільська область", type="city"),
+    689558: dict(name="Вінниця", oblast="Вінницька область", type="city"),
+    706369: dict(name="Хмельницький", oblast="Хмельницька область", type="city"),
+    705812: dict(name="Кропивницький", oblast="Кіровоградська область", type="city"),
+    706448: dict(name="Херсон", oblast="Херсонська область", type="city"),
+    695594: dict(name="Рівне", oblast="Рівненська область", type="city"),
+    702569: dict(name="Луцьк", oblast="Волинська область", type="city"),
+    710719: dict(name="Чернівці", oblast="Чернівецька область", type="city"),
+    710735: dict(name="Чернігів", oblast="Чернігівська область", type="city"),
+    710791: dict(name="Черкаси", oblast="Черкаська область", type="city"),
+    703446: dict(name="Сімферополь", oblast="Автономна Республіка Крим", type="city"),
+}
+
 # UA admin1_code → oblast/city/AR title matching what alerts.in.ua reports.
 ADMIN1: dict[str, str] = {
     "01": "Черкаська область",
@@ -124,14 +158,24 @@ def parse_rows(text_stream: Iterable[bytes]) -> list[dict]:
         if cols[6] != "P":  # feature_class
             continue
 
-        admin1 = cols[10]
-        oblast = ADMIN1.get(admin1)
-        if not oblast:
+        try:
+            geonameid = int(cols[0])
+        except ValueError:
             continue
 
-        name_uk = pick_uk_name(cols[1], cols[3])
-        if not name_uk:
-            continue
+        override = GEONAME_OVERRIDES.get(geonameid)
+        if override is not None:
+            name_uk = override["name"]
+            oblast = override["oblast"]
+            type_override = override["type"]
+        else:
+            oblast = ADMIN1.get(cols[10])
+            if not oblast:
+                continue
+            name_uk = pick_uk_name(cols[1], cols[3])
+            if not name_uk:
+                continue
+            type_override = None
 
         try:
             lat = float(cols[4])
@@ -147,7 +191,7 @@ def parse_rows(text_stream: Iterable[bytes]) -> list[dict]:
                 "raion": None,
                 "lat": lat,
                 "lon": lon,
-                "type": bucket_type(cols[14]),
+                "type": type_override or bucket_type(cols[14]),
             }
         )
     return out
