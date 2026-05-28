@@ -1,6 +1,13 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { QueryProvider } from "@/providers/QueryProvider";
+import { ServiceWorkerInit } from "@/components/ServiceWorkerInit";
+
+export const viewport: Viewport = {
+  themeColor: "#0a0a0b",
+  width: "device-width",
+  initialScale: 1,
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://xn----8sbkccc5iwa.online"),
@@ -44,6 +51,7 @@ export default function RootLayout({
     <html lang="uk">
       <body>
         <QueryProvider>{children}</QueryProvider>
+        <ServiceWorkerInit />
       </body>
     </html>
   );
