@@ -55,14 +55,10 @@ export function selectActiveTitles(state: AlertsState): Set<string> {
 // Severity ladder — higher index wins when an oblast has multiple alerts.
 const SEVERITY: Record<OblastAlertState, number> = {
   safe: 0,
-  potential: 1,
-  air_raid: 2,
-  air_raid_drone: 3,
-  artillery_shelling: 4,
-  urban_fights: 5,
+  air_raid: 1,
+  artillery_shelling: 2,
+  urban_fights: 3,
 };
-
-const DRONE_NOTES_RE = /бпла|дрон|шахед|shahed/i;
 
 function classify(a: AlertView): OblastAlertState {
   switch (a.alert_type) {
@@ -71,7 +67,7 @@ function classify(a: AlertView): OblastAlertState {
     case "artillery_shelling":
       return "artillery_shelling";
     case "air_raid":
-      return a.notes && DRONE_NOTES_RE.test(a.notes) ? "air_raid_drone" : "air_raid";
+      return "air_raid";
     default:
       return "air_raid";
   }
@@ -79,14 +75,10 @@ function classify(a: AlertView): OblastAlertState {
 
 /** Per-oblast aggregate that splits oblast-level vs sub-region alerts.
  *
- *  Choropleth paints `state`:
- *    - if any oblast-level alert is in effect → max severity of those
- *    - else if any sub-region alert is in effect → "potential" (yellow)
- *    - else → "safe"
- *
- *  This prevents one hromada's urban_fights from flooding the whole oblast
- *  with the most severe colour — those still surface in the popup's
- *  `sub` list, just not on the choropleth fill.
+ *  Choropleth paints `state` ONLY from oblast-level alerts. Sub-region
+ *  alerts still appear in the hover popup's `sub` list — they just don't
+ *  recolour the whole region (one hromada urban_fights ≠ whole oblast on
+ *  fire).
  */
 export function selectOblastAggregate(state: AlertsState): Map<string, OblastAggregate> {
   const out = new Map<string, OblastAggregate>();
@@ -105,8 +97,6 @@ export function selectOblastAggregate(state: AlertsState): Map<string, OblastAgg
         agg.oblast_level = true;
       }
     } else {
-      // sub-region; record details for popup, escalate map only to "potential"
-      // when nothing oblast-level outranks it.
       const sub: OblastSubAlert = {
         title: a.location_title,
         state: cls,
@@ -115,9 +105,6 @@ export function selectOblastAggregate(state: AlertsState): Map<string, OblastAgg
         started_at: a.started_at,
       };
       agg.sub.push(sub);
-      if (!agg.oblast_level && agg.state === "safe") {
-        agg.state = "potential";
-      }
     }
   }
   return out;

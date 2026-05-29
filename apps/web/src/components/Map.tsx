@@ -27,6 +27,11 @@ const TRAJECTORIES_HEAD_LAYER = "trajectories-head";
 const HEATMAP_SOURCE = "heatmap";
 const HEATMAP_FILL_LAYER = "heatmap-fill";
 
+const SHELTERS_SOURCE = "shelters";
+const SHELTERS_CLUSTER_LAYER = "shelters-cluster";
+const SHELTERS_CLUSTER_COUNT = "shelters-cluster-count";
+const SHELTERS_POINT_LAYER = "shelters-point";
+
 const PUSH_REGION_LS_KEY = "deshahed.pushRegion";
 const PUSH_REGION_EVENT = "deshahed:pushRegionChange";
 
@@ -105,6 +110,17 @@ export function Map() {
     m.setLayoutProperty(HEATMAP_FILL_LAYER, "visibility", visible ? "visible" : "none");
   }, []);
 
+  // Reactive shelters visibility — three layers toggled together.
+  const sheltersOn = useUiStore((s) => s.sheltersOn);
+  useEffect(() => {
+    const m = mapRef.current;
+    if (!m) return;
+    const v = sheltersOn ? "visible" : "none";
+    for (const id of [SHELTERS_CLUSTER_LAYER, SHELTERS_CLUSTER_COUNT, SHELTERS_POINT_LAYER]) {
+      if (m.getLayer(id)) m.setLayoutProperty(id, "visibility", v);
+    }
+  }, [sheltersOn]);
+
   // Re-paint the choropleth scale when max_weight changes — keeps the
   // color stretch meaningful as the dataset grows or shrinks.
   useEffect(() => {
@@ -161,9 +177,7 @@ export function Map() {
             ["get", "state"],
             "urban_fights", "#a855f7",
             "artillery_shelling", "#f97316",
-            "air_raid_drone", "#b91c1c",
             "air_raid", "#ef4444",
-            "potential", "#eab308",
             "#1f2937",
           ],
           "fill-opacity": [
@@ -171,9 +185,7 @@ export function Map() {
             ["get", "state"],
             "urban_fights", 0.55,
             "artillery_shelling", 0.5,
-            "air_raid_drone", 0.5,
             "air_raid", 0.45,
-            "potential", 0.28,
             0.55,
           ],
         },
@@ -355,6 +367,95 @@ export function Map() {
         DRONES_POINT_LAYER,
       );
 
+      // Shelters — OSM amenity=shelter + military=bunker filtered to bomb-
+      // shelter-relevant subtypes (see public/geo/shelters.geojson). Heavy
+      // dataset (~14k points) so we cluster aggressively until z11.
+      map.addSource(SHELTERS_SOURCE, {
+        type: "geojson",
+        data: "/geo/shelters.geojson",
+        cluster: true,
+        clusterRadius: 50,
+        clusterMaxZoom: 11,
+      });
+      map.addLayer({
+        id: SHELTERS_CLUSTER_LAYER,
+        type: "circle",
+        source: SHELTERS_SOURCE,
+        filter: ["has", "point_count"],
+        layout: { visibility: "none" },
+        paint: {
+          "circle-color": "#16a34a",
+          "circle-stroke-color": "#0a0a0b",
+          "circle-stroke-width": 1.5,
+          "circle-opacity": 0.85,
+          "circle-radius": [
+            "step", ["get", "point_count"],
+            10, 25, 14, 100, 18, 500, 22,
+          ],
+        },
+      });
+      map.addLayer({
+        id: SHELTERS_CLUSTER_COUNT,
+        type: "symbol",
+        source: SHELTERS_SOURCE,
+        filter: ["has", "point_count"],
+        layout: {
+          visibility: "none",
+          "text-field": ["get", "point_count_abbreviated"],
+          "text-font": ["Noto Sans Regular"],
+          "text-size": 11,
+        },
+        paint: { "text-color": "#0a0a0b" },
+      });
+      map.addLayer({
+        id: SHELTERS_POINT_LAYER,
+        type: "circle",
+        source: SHELTERS_SOURCE,
+        filter: ["!", ["has", "point_count"]],
+        layout: { visibility: "none" },
+        paint: {
+          "circle-color": "#22c55e",
+          "circle-stroke-color": "#0a0a0b",
+          "circle-stroke-width": 1.2,
+          "circle-radius": 5,
+          "circle-opacity": 0.95,
+        },
+      });
+
+      // Shelter point popup on hover.
+      const shelterPopup = new maplibregl.Popup({
+        closeButton: false, closeOnClick: false, className: "deshahed-popup", offset: 6,
+      });
+      map.on("mouseenter", SHELTERS_POINT_LAYER, (e) => {
+        if (!e.features || !e.features.length) return;
+        map.getCanvas().style.cursor = "pointer";
+        const p = (e.features[0].properties ?? {}) as { name?: string; addr?: string };
+        const html = `
+          <div class="px-2 py-1.5 max-w-[260px]">
+            <div class="text-[12px] font-medium text-emerald-300">Укриття</div>
+            <div class="mt-0.5 text-[11px] text-zinc-100">${(p.name ?? "Без назви").replace(/[<>]/g, "")}</div>
+            ${p.addr ? `<div class="text-[11px] text-zinc-400">${String(p.addr).replace(/[<>]/g, "")}</div>` : ""}
+          </div>`;
+        shelterPopup.setLngLat(e.lngLat).setHTML(html).addTo(map);
+      });
+      map.on("mouseleave", SHELTERS_POINT_LAYER, () => {
+        map.getCanvas().style.cursor = "";
+        shelterPopup.remove();
+      });
+      // Click a cluster → zoom in.
+      map.on("click", SHELTERS_CLUSTER_LAYER, async (e) => {
+        const feat = e.features?.[0];
+        if (!feat) return;
+        const clusterId = (feat.properties as { cluster_id?: number }).cluster_id;
+        if (clusterId == null) return;
+        const src = map.getSource(SHELTERS_SOURCE) as maplibregl.GeoJSONSource;
+        try {
+          const zoom = await src.getClusterExpansionZoom(clusterId);
+          const coords = (feat.geometry as GeoJSON.Point).coordinates as [number, number];
+          map.easeTo({ center: coords, zoom });
+        } catch { /* fine */ }
+      });
+
       applyDroneState();
       applyTracksState();
 
@@ -369,9 +470,7 @@ export function Map() {
       const STATE_LABELS: Record<string, { label: string; color: string }> = {
         urban_fights: { label: "Загроза вуличних боїв", color: "text-purple-300" },
         artillery_shelling: { label: "Загроза артобстрілу", color: "text-orange-300" },
-        air_raid_drone: { label: "Ударні/імітаційні БпЛА", color: "text-red-300" },
         air_raid: { label: "Повітряна тривога", color: "text-red-400" },
-        potential: { label: "Потенційні загрози", color: "text-amber-300" },
       };
 
       const escapeHtml = (s: string) =>

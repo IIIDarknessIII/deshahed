@@ -32,9 +32,7 @@ export interface AlertView {
 export type OblastAlertState =
   | "urban_fights"
   | "artillery_shelling"
-  | "air_raid_drone"
   | "air_raid"
-  | "potential"   // sub-region alert only — oblast-level is clean
   | "safe";
 
 export interface OblastSubAlert {
