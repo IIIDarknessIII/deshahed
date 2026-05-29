@@ -6,6 +6,7 @@ import type {
   OblastAlertState,
   OblastSubAlert,
 } from "@/lib/types";
+import { subKey } from "@/lib/subregions";
 
 type Key = string;
 
@@ -119,6 +120,32 @@ export function selectOblastAggregate(state: AlertsState): Map<string, OblastAgg
         location_type: a.location_type,
         started_at: a.started_at,
       });
+    }
+  }
+  return out;
+}
+
+export interface SubRegionState {
+  state: OblastAlertState;
+  started_at: string;
+  title: string;
+}
+
+/**
+ * Per-sub-region state keyed by the normalized match key (see lib/subregions).
+ * Drives the raion/hromada choropleth directly: unlike the oblast roll-up, a
+ * sub-region paints with its *own* alert (including urban_fights, which is
+ * confined to a single hromada and so belongs exactly here).
+ */
+export function selectSubRegionStates(state: AlertsState): Map<string, SubRegionState> {
+  const out = new Map<string, SubRegionState>();
+  for (const a of state.alerts.values()) {
+    if (a.location_type !== "raion" && a.location_type !== "hromada") continue;
+    const key = subKey(a.location_title);
+    const cls = classify(a);
+    const prev = out.get(key);
+    if (!prev || SEVERITY[cls] > SEVERITY[prev.state]) {
+      out.set(key, { state: cls, started_at: a.started_at, title: a.location_title });
     }
   }
   return out;

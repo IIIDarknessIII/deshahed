@@ -21,6 +21,9 @@ export function AlertLegend() {
           </li>
         ))}
       </ul>
+      <div className="mt-2.5 border-t border-border/60 pt-2 text-[11px] leading-snug text-zinc-500">
+        Наближайте карту, щоб побачити ситуацію по районах і громадах.
+      </div>
     </div>
   );
 }

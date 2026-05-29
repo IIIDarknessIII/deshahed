@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import maplibregl, { type Map as MapLibreMap } from "maplibre-gl";
-import { useAlertsStore, selectOblastAggregate } from "@/stores/alertsStore";
+import {
+  useAlertsStore,
+  selectOblastAggregate,
+  selectSubRegionStates,
+} from "@/stores/alertsStore";
 import { useDronesStore } from "@/stores/dronesStore";
 import { useTracksStore } from "@/stores/tracksStore";
 import { useUiStore } from "@/stores/uiStore";
@@ -14,6 +18,9 @@ const SOURCE_ID = "oblasts";
 const FILL_LAYER = "oblasts-fill";
 const LINE_LAYER = "oblasts-line";
 const LABEL_LAYER = "oblasts-label";
+// Single label anchor per oblast (largest-part representative point). Labelling
+// the polygon source directly duplicates labels on island/delta multipolygons.
+const OBLAST_LABELS_SOURCE = "oblast-labels";
 
 const DRONES_SOURCE = "drones";
 const DRONES_POINT_LAYER = "drones-point";
@@ -26,6 +33,40 @@ const TRAJECTORIES_HEAD_LAYER = "trajectories-head";
 
 const HEATMAP_SOURCE = "heatmap";
 const HEATMAP_FILL_LAYER = "heatmap-fill";
+
+const RAIONS_SOURCE = "raions";
+const RAIONS_FILL = "raions-fill";
+const RAIONS_LINE = "raions-line";
+
+const HROMADAS_SOURCE = "hromadas";
+const HROMADAS_FILL = "hromadas-fill";
+const HROMADAS_LINE = "hromadas-line";
+
+// Zoom bands — only one administrative fill is active at a time so the layers
+// never double-paint. maxZoom on the map is 9.
+const RAION_MIN_ZOOM = 6;
+const HROMADA_MIN_ZOOM = 7.5;
+
+// Shared choropleth paint for the sub-region fills. "safe" is fully
+// transparent so only regions with an active alert tint the map.
+const SUBREGION_FILL_PAINT: maplibregl.FillLayerSpecification["paint"] = {
+  "fill-color": [
+    "match",
+    ["get", "state"],
+    "urban_fights", "#a855f7",
+    "artillery_shelling", "#f97316",
+    "air_raid", "#ef4444",
+    "#1f2937",
+  ],
+  "fill-opacity": [
+    "match",
+    ["get", "state"],
+    "urban_fights", 0.6,
+    "artillery_shelling", 0.55,
+    "air_raid", 0.5,
+    0,
+  ],
+};
 
 const SHELTERS_SOURCE = "shelters";
 const SHELTERS_CLUSTER_LAYER = "shelters-cluster";
@@ -94,6 +135,9 @@ export function Map() {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const geojsonRef = useRef<GeoJSON.FeatureCollection | null>(null);
+  const raionsGeoRef = useRef<GeoJSON.FeatureCollection | null>(null);
+  const hromadasGeoRef = useRef<GeoJSON.FeatureCollection | null>(null);
+  const hromadasAddedRef = useRef(false);
   const [maxWeight, setMaxWeight] = useState(1);
 
   const setHeatmapData = useCallback((fc: GeoJSON.FeatureCollection) => {
@@ -183,6 +227,9 @@ export function Map() {
         id: FILL_LAYER,
         type: "fill",
         source: SOURCE_ID,
+        // Hand off to the raion choropleth once the user zooms past the
+        // country-overview band.
+        maxzoom: RAION_MIN_ZOOM,
         paint: {
           "fill-color": [
             "match",
@@ -221,12 +268,17 @@ export function Map() {
         },
       });
 
-      // Oblast names painted at the polygon's pole-of-inaccessibility.
-      // Cyrillic glyphs come from the demotiles CDN declared on STYLE.glyphs.
+      // Oblast names from a dedicated one-point-per-oblast source (avoids the
+      // duplicate labels MultiPolygon parts produce). Cyrillic glyphs come from
+      // the demotiles CDN declared on STYLE.glyphs.
+      map.addSource(OBLAST_LABELS_SOURCE, {
+        type: "geojson",
+        data: "/geo/oblast_labels.geojson",
+      });
       map.addLayer({
         id: LABEL_LAYER,
         type: "symbol",
-        source: SOURCE_ID,
+        source: OBLAST_LABELS_SOURCE,
         layout: {
           "text-field": ["get", "name_uk"],
           "text-font": ["Noto Sans Regular"],
@@ -249,6 +301,40 @@ export function Map() {
           "text-halo-blur": 0.4,
         },
       });
+
+      // Raion choropleth (OSM admin level 6, ~0.7 MB, loaded eagerly). The
+      // sub-region fill sits *below* the oblast border line so oblast outlines
+      // and labels stay legible on top. Hromadas are loaded lazily on zoom-in
+      // (addHromadas) to keep the initial payload small.
+      {
+        const rResp = await fetch("/geo/raions.geojson");
+        if (cancelled) return;
+        const raions = (await rResp.json()) as GeoJSON.FeatureCollection;
+        if (cancelled) return;
+        raionsGeoRef.current = raions;
+        map.addSource(RAIONS_SOURCE, { type: "geojson", data: raions });
+        map.addLayer(
+          {
+            id: RAIONS_FILL,
+            type: "fill",
+            source: RAIONS_SOURCE,
+            minzoom: RAION_MIN_ZOOM,
+            maxzoom: HROMADA_MIN_ZOOM,
+            paint: SUBREGION_FILL_PAINT,
+          },
+          LINE_LAYER,
+        );
+        map.addLayer(
+          {
+            id: RAIONS_LINE,
+            type: "line",
+            source: RAIONS_SOURCE,
+            minzoom: RAION_MIN_ZOOM,
+            paint: { "line-color": "#3f3f46", "line-width": 0.6, "line-opacity": 0.8 },
+          },
+          LINE_LAYER,
+        );
+      }
 
       // Heatmap — installed empty + invisible at startup; the HeatmapController
       // patches data + visibility based on uiStore.
@@ -561,8 +647,88 @@ export function Map() {
         if (uid !== undefined) useUiStore.getState().selectLocation(uid);
       });
 
+      // Raion / hromada hover popup — region name + its own alert state and
+      // duration (looked up by the normalized match key on the feature).
+      const subPopup = new maplibregl.Popup({
+        closeButton: false,
+        closeOnClick: false,
+        className: "deshahed-popup",
+        offset: 8,
+      });
+      const onSubMove = (e: maplibregl.MapLayerMouseEvent) => {
+        if (cancelled || !e.features || e.features.length === 0) return;
+        map.getCanvas().style.cursor = "pointer";
+        const p = (e.features[0].properties ?? {}) as { name_uk?: string; mkey?: string };
+        const states = selectSubRegionStates(useAlertsStore.getState());
+        const sr = p.mkey ? states.get(p.mkey) : undefined;
+        const meta = sr ? STATE_LABELS[sr.state] : null;
+        let durationLabel = "";
+        if (sr) {
+          const min = Math.max(0, Math.floor((Date.now() - +new Date(sr.started_at)) / 60_000));
+          durationLabel = min > 0 ? ` · ${min} хв` : " · щойно";
+        }
+        const header = meta
+          ? `<div class="mt-0.5 text-[11px] ${meta.color}">${meta.label}${durationLabel}</div>`
+          : `<div class="mt-0.5 text-[11px] text-zinc-500">Немає інформації про тривогу</div>`;
+        subPopup
+          .setLngLat(e.lngLat)
+          .setHTML(
+            `<div class="px-2 py-1.5 max-w-[240px]"><div class="text-[12px] font-medium text-zinc-100">${escapeHtml(p.name_uk ?? "")}</div>${header}</div>`,
+          )
+          .addTo(map);
+      };
+      const onSubLeave = () => {
+        map.getCanvas().style.cursor = "";
+        subPopup.remove();
+      };
+      map.on("mousemove", RAIONS_FILL, onSubMove);
+      map.on("mouseleave", RAIONS_FILL, onSubLeave);
+
+      // Hromadas (admin level 7, ~1.75 MB) are fetched only once the user
+      // zooms in far enough to need them, then wired up the same way.
+      const addHromadas = async () => {
+        if (hromadasAddedRef.current) return;
+        hromadasAddedRef.current = true;
+        try {
+          const hResp = await fetch("/geo/hromadas.geojson");
+          const hromadas = (await hResp.json()) as GeoJSON.FeatureCollection;
+          if (cancelled || map.getSource(HROMADAS_SOURCE)) return;
+          hromadasGeoRef.current = hromadas;
+          map.addSource(HROMADAS_SOURCE, { type: "geojson", data: hromadas });
+          map.addLayer(
+            {
+              id: HROMADAS_FILL,
+              type: "fill",
+              source: HROMADAS_SOURCE,
+              minzoom: HROMADA_MIN_ZOOM,
+              paint: SUBREGION_FILL_PAINT,
+            },
+            LINE_LAYER,
+          );
+          map.addLayer(
+            {
+              id: HROMADAS_LINE,
+              type: "line",
+              source: HROMADAS_SOURCE,
+              minzoom: HROMADA_MIN_ZOOM,
+              paint: { "line-color": "#3f3f46", "line-width": 0.4, "line-opacity": 0.6 },
+            },
+            LINE_LAYER,
+          );
+          map.on("mousemove", HROMADAS_FILL, onSubMove);
+          map.on("mouseleave", HROMADAS_FILL, onSubLeave);
+          applySubState();
+        } catch {
+          hromadasAddedRef.current = false; // allow a retry on the next zoom
+        }
+      };
+      map.on("zoom", () => {
+        if (!hromadasAddedRef.current && map.getZoom() >= HROMADA_MIN_ZOOM) addHromadas();
+      });
+
       // Initial paint from current store state.
       applyAlertState();
+      applySubState();
     });
 
     const applyAlertState = () => {
@@ -588,6 +754,35 @@ export function Map() {
           | maplibregl.GeoJSONSource
           | undefined;
         src?.setData(geo);
+      }
+    };
+
+    // Repaint raion + hromada fills from their own alert state, matched by the
+    // normalized `mkey` property. Hromadas are skipped until lazily loaded.
+    const applySubState = () => {
+      const m = mapRef.current;
+      if (!m) return;
+      const states = selectSubRegionStates(useAlertsStore.getState());
+      const layers = [
+        [raionsGeoRef, RAIONS_SOURCE],
+        [hromadasGeoRef, HROMADAS_SOURCE],
+      ] as const;
+      for (const [ref, srcId] of layers) {
+        const geo = ref.current;
+        if (!geo) continue;
+        let changed = false;
+        for (const f of geo.features) {
+          const k = (f.properties as { mkey?: string } | null)?.mkey;
+          const next = (k && states.get(k)?.state) || "safe";
+          const props = f.properties as { state?: string } | null;
+          if (props?.state !== next) {
+            (f.properties as Record<string, unknown>).state = next;
+            changed = true;
+          }
+        }
+        if (changed) {
+          (m.getSource(srcId) as maplibregl.GeoJSONSource | undefined)?.setData(geo);
+        }
       }
     };
 
@@ -669,6 +864,7 @@ export function Map() {
     };
 
     const unsubscribe = useAlertsStore.subscribe(applyAlertState);
+    const unsubscribeSub = useAlertsStore.subscribe(applySubState);
     const unsubscribeDrones = useDronesStore.subscribe(applyDroneState);
     const unsubscribeTracks = useTracksStore.subscribe(applyTracksState);
 
@@ -679,6 +875,7 @@ export function Map() {
     return () => {
       cancelled = true;
       unsubscribe();
+      unsubscribeSub();
       unsubscribeDrones();
       unsubscribeTracks();
       window.removeEventListener("storage", onPushRegionChange);

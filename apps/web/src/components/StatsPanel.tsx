@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Film, Flame, LineChart, X } from "lucide-react";
+import { Film, Flame, Heart, LineChart, Smartphone, X } from "lucide-react";
+import { SUPPORT_URL } from "@/lib/links";
 import { useStatsSummary } from "@/hooks/useStats";
 import { useUiStore, type HeatmapPeriod } from "@/stores/uiStore";
 import { formatDuration } from "@/lib/format";
@@ -93,6 +94,29 @@ export function StatsPanel() {
           </span>
           <span className="text-[10px] uppercase tracking-wide">відкрити</span>
         </Link>
+
+        <a
+          href={SUPPORT_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex w-full items-center justify-between rounded-md border border-rose-500/40 bg-rose-500/5 px-3 py-2 text-sm text-rose-200 transition hover:border-rose-400/80 hover:bg-rose-500/10"
+          title="Підтримати проєкт"
+        >
+          <span className="flex items-center gap-2">
+            <Heart size={14} className="fill-rose-500/70 text-rose-400" />
+            Підтримати проєкт
+          </span>
+          <span className="text-[10px] uppercase tracking-wide">monobank</span>
+        </a>
+
+        {/* Desktop-only note — phone users get the install banner instead. */}
+        <div className="hidden items-start gap-2 rounded-md border border-border bg-bg/60 px-3 py-2 text-[11px] leading-snug text-zinc-400 md:flex">
+          <Smartphone size={14} className="mt-0.5 shrink-0 text-zinc-300" />
+          <span>
+            Є застосунок для телефону — відкрийте deshahed на смартфоні та
+            встановіть його на головний екран.
+          </span>
+        </div>
       </div>
 
       <div className="border-t border-border px-4 py-3">

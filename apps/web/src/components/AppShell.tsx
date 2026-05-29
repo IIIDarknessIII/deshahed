@@ -9,6 +9,8 @@ import { StatsPanel } from "@/components/StatsPanel";
 import { HistoryModal } from "@/components/HistoryModal";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { AviationBanner } from "@/components/AviationBanner";
+import { SupportButton } from "@/components/SupportButton";
+import { InstallPrompt } from "@/components/InstallPrompt";
 import { useUiStore } from "@/stores/uiStore";
 
 export function AppShell() {
@@ -27,6 +29,7 @@ export function AppShell() {
       <div className="relative min-h-0 w-full flex-1">
         <Map />
         <AviationBanner />
+        <SupportButton />
       </div>
       <StatsPanel />
 
@@ -40,6 +43,7 @@ export function AppShell() {
         />
       )}
 
+      <InstallPrompt />
       <MobileBottomNav />
       <HistoryModal />
     </main>
