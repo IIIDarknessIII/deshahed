@@ -308,7 +308,14 @@ export function Map() {
             "aviation", "drone-aviation",
             "drone-shahed",
           ],
-          "icon-size": 0.55,
+          // ~40 px at country overview, ~28 px when zoomed in. Source
+          // image is 32 px, so 1.4 == ~45 px on the canvas at z4.
+          "icon-size": [
+            "interpolate", ["linear"], ["zoom"],
+            4, 1.4,
+            6, 1.1,
+            8, 0.9,
+          ],
           "icon-allow-overlap": true,
           "icon-rotation-alignment": "map",
         },
@@ -349,7 +356,12 @@ export function Map() {
           source: TRAJECTORIES_SOURCE,
           filter: ["==", ["geometry-type"], "Point"],
           paint: {
-            "circle-radius": 4,
+            "circle-radius": [
+              "interpolate", ["linear"], ["zoom"],
+              4, 9,
+              6, 7,
+              8, 6,
+            ],
             "circle-color": [
               "match",
               ["get", "event_type"],
@@ -360,7 +372,7 @@ export function Map() {
               "#9ca3af",
             ],
             "circle-stroke-color": "#0a0a0b",
-            "circle-stroke-width": 1,
+            "circle-stroke-width": 1.6,
             "circle-opacity": 0.95,
           },
         },
