@@ -1,7 +1,10 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import "./globals.css";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { ServiceWorkerInit } from "@/components/ServiceWorkerInit";
+
+const GA_ID = "G-B1N64BFB0R";
 
 export const viewport: Viewport = {
   themeColor: "#0a0a0b",
@@ -78,6 +81,19 @@ export default function RootLayout({
 }) {
   return (
     <html lang="uk">
+      <head>
+        {/* Google tag (gtag.js) */}
+        <Script
+          src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
+          strategy="afterInteractive"
+        />
+        <Script id="gtag-init" strategy="afterInteractive">
+          {`window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', '${GA_ID}');`}
+        </Script>
+      </head>
       <body>
         <QueryProvider>{children}</QueryProvider>
         <ServiceWorkerInit />
