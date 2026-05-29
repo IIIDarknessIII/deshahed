@@ -73,12 +73,25 @@ function classify(a: AlertView): OblastAlertState {
   }
 }
 
-/** Per-oblast aggregate that splits oblast-level vs sub-region alerts.
+// Which states are area-wide enough that a sub-region alert should still
+// paint the whole oblast. air_raid and artillery_shelling cover broad
+// territory (sirens / counter-battery zones); urban_fights is by definition
+// confined to a single hromada, so a sub-region urban_fights stays out of
+// the choropleth and is shown only in the popup.
+const ESCALATES_FROM_SUB: ReadonlySet<OblastAlertState> = new Set([
+  "air_raid",
+  "artillery_shelling",
+]);
+
+/** Per-oblast aggregate that combines oblast-level + escalated sub alerts.
  *
- *  Choropleth paints `state` ONLY from oblast-level alerts. Sub-region
- *  alerts still appear in the hover popup's `sub` list — they just don't
- *  recolour the whole region (one hromada urban_fights ≠ whole oblast on
- *  fire).
+ *  Choropleth paints `state`:
+ *    - max-severity over (oblast-level alerts ∪ sub-region alerts whose
+ *      type is in ESCALATES_FROM_SUB).
+ *    - "safe" when neither contributes.
+ *
+ *  The hover popup still gets the full `sub` list — including urban_fights
+ *  in tiny hromadas that are intentionally excluded from the choropleth.
  */
 export function selectOblastAggregate(state: AlertsState): Map<string, OblastAggregate> {
   const out = new Map<string, OblastAggregate>();
@@ -91,20 +104,21 @@ export function selectOblastAggregate(state: AlertsState): Map<string, OblastAgg
       agg = { state: "safe", oblast_level: false, sub: [] };
       out.set(title, agg);
     }
-    if (isOblast) {
-      if (!agg.oblast_level || SEVERITY[cls] > SEVERITY[agg.state]) {
-        agg.state = cls;
-        agg.oblast_level = true;
-      }
-    } else {
-      const sub: OblastSubAlert = {
+
+    const paintsChoropleth = isOblast || ESCALATES_FROM_SUB.has(cls);
+    if (paintsChoropleth && SEVERITY[cls] > SEVERITY[agg.state]) {
+      agg.state = cls;
+    }
+    if (isOblast) agg.oblast_level = true;
+
+    if (!isOblast) {
+      agg.sub.push({
         title: a.location_title,
         state: cls,
         alert_type: a.alert_type,
         location_type: a.location_type,
         started_at: a.started_at,
-      };
-      agg.sub.push(sub);
+      });
     }
   }
   return out;
