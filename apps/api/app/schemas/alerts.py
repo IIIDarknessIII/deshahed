@@ -126,3 +126,16 @@ class ComparisonResponse(BaseModel):
     yesterday: ComparisonStats
     alerts_delta_pct: float | None       # null if yesterday=0 (undefined ratio)
     duration_delta_pct: float | None
+
+
+class TimelapseFrame(BaseModel):
+    t: datetime
+    # Only oblasts with non-safe state in this frame. Title → state code.
+    oblasts: dict[str, str]
+
+
+class TimelapseResponse(BaseModel):
+    started_at: datetime
+    ended_at: datetime
+    step_seconds: int
+    frames: list[TimelapseFrame]

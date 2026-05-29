@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Flame, LineChart, X } from "lucide-react";
+import { Film, Flame, LineChart, X } from "lucide-react";
 import { useStatsSummary } from "@/hooks/useStats";
 import { useUiStore, type HeatmapPeriod } from "@/stores/uiStore";
 import { formatDuration } from "@/lib/format";
@@ -90,6 +90,17 @@ export function StatsPanel() {
         <PushSubscribe />
         <SoundToggle />
         <ShelterToggle />
+        <Link
+          href="/timelapse"
+          className="flex w-full items-center justify-between rounded-md border border-border px-3 py-2 text-sm text-zinc-300 transition hover:border-zinc-600"
+          title="Анімація тривог за 24 години"
+        >
+          <span className="flex items-center gap-2">
+            <Film size={14} />
+            Тайм-лапс 24 год
+          </span>
+          <span className="text-[10px] uppercase tracking-wide">відкрити</span>
+        </Link>
       </div>
 
       <div className="border-t border-border px-4 py-3">

@@ -30,6 +30,8 @@ from app.schemas.alerts import (
     HistoryResponse,
     OblastStat,
     SummaryResponse,
+    TimelapseFrame,
+    TimelapseResponse,
 )
 
 from sqlalchemy import text
@@ -364,4 +366,80 @@ async def get_stats_comparison() -> ComparisonResponse:
         yesterday=yesterday,
         alerts_delta_pct=delta_pct(today.total_alerts, yesterday.total_alerts),
         duration_delta_pct=delta_pct(today.total_duration_minutes, yesterday.total_duration_minutes),
+    )
+
+
+# State-aggregation rule for the timelapse — must mirror the frontend's
+# selectOblastAggregate so the animation looks identical to the live map:
+#   - air_raid / artillery_shelling at any level paint the parent oblast
+#   - urban_fights only paints when fired at oblast level itself
+#   - severity ladder: urban_fights > artillery_shelling > air_raid > safe
+_SEVERITY = {"safe": 0, "air_raid": 1, "artillery_shelling": 2, "urban_fights": 3}
+_ESCALATES_FROM_SUB = {"air_raid", "artillery_shelling"}
+
+
+def _classify(alert_type: str) -> str:
+    if alert_type in ("urban_fights", "artillery_shelling", "air_raid"):
+        return alert_type
+    return "air_raid"
+
+
+@router.get("/stats/timelapse", response_model=TimelapseResponse)
+async def get_timelapse(
+    hours: int = Query(24, ge=1, le=72),
+    step_seconds: int = Query(300, ge=60, le=1800),
+) -> TimelapseResponse:
+    """Per-oblast state at every step over the last N hours.
+
+    Built for the /timelapse animation. Compact — frames carry only oblasts
+    whose state is non-safe, so a quiet hour is ~80 bytes of JSON.
+    """
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    start = now - timedelta(hours=hours)
+    step = timedelta(seconds=step_seconds)
+
+    factory = get_session_factory()
+    async with factory() as session:
+        # All events that overlap [start, now]: either still active or
+        # finished after start.
+        result = await session.execute(
+            select(
+                AlertEvent.location_type,
+                AlertEvent.location_oblast,
+                AlertEvent.location_title,
+                AlertEvent.alert_type,
+                AlertEvent.started_at,
+                AlertEvent.finished_at,
+            ).where(
+                AlertEvent.started_at <= now,
+                (AlertEvent.finished_at.is_(None)) | (AlertEvent.finished_at >= start),
+            )
+        )
+        rows = result.all()
+
+    frames: list[TimelapseFrame] = []
+    t = start
+    while t <= now:
+        oblasts: dict[str, str] = {}
+        for r in rows:
+            if r.started_at > t:
+                continue
+            if r.finished_at is not None and r.finished_at < t:
+                continue
+            cls = _classify(r.alert_type)
+            is_obl = r.location_type in ("oblast", "autonomous_republic")
+            if not is_obl and cls not in _ESCALATES_FROM_SUB:
+                continue
+            title = r.location_oblast or r.location_title
+            prev = oblasts.get(title, "safe")
+            if _SEVERITY[cls] > _SEVERITY[prev]:
+                oblasts[title] = cls
+        frames.append(TimelapseFrame(t=t, oblasts=oblasts))
+        t += step
+
+    return TimelapseResponse(
+        started_at=start,
+        ended_at=now,
+        step_seconds=step_seconds,
+        frames=frames,
     )
