@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import type { Metadata } from "next";
 import { REGIONS, REGION_BY_SLUG } from "@/lib/regions";
+import { SUBREGIONS } from "@/lib/subregions_index";
 import { RegionHistory } from "@/components/region/RegionHistory";
 
 interface Props {
@@ -44,6 +45,10 @@ export default async function RegionPage({ params }: Props) {
   const region = REGION_BY_SLUG[slug];
   if (!region) notFound();
 
+  const children = SUBREGIONS.filter((s) => s.oblastSlug === region.slug);
+  const raions = children.filter((s) => s.type === "raion");
+  const hromadas = children.filter((s) => s.type === "hromada");
+
   return (
     <main className="min-h-dvh bg-bg">
       <header className="sticky top-0 z-10 border-b border-border bg-bg/95 pt-[var(--safe-top)] backdrop-blur">
@@ -78,6 +83,50 @@ export default async function RegionPage({ params }: Props) {
           regionTitle={region.title}
           oblastFullName={region.full_name_uk}
         />
+
+        {(raions.length > 0 || hromadas.length > 0) && (
+          <section className="rounded-md border border-border p-4">
+            <h2 className="mb-3 text-sm font-semibold text-zinc-100">
+              Райони та громади області
+            </h2>
+            {raions.length > 0 && (
+              <>
+                <div className="mb-1.5 text-[11px] uppercase tracking-wide text-zinc-500">
+                  Райони
+                </div>
+                <div className="mb-3 flex flex-wrap gap-x-3 gap-y-1">
+                  {raions.map((s) => (
+                    <Link
+                      key={s.slug}
+                      href={`/raion/${s.slug}`}
+                      className="text-sm text-zinc-300 underline-offset-2 hover:text-zinc-100 hover:underline"
+                    >
+                      {s.name_uk}
+                    </Link>
+                  ))}
+                </div>
+              </>
+            )}
+            {hromadas.length > 0 && (
+              <>
+                <div className="mb-1.5 text-[11px] uppercase tracking-wide text-zinc-500">
+                  Громади
+                </div>
+                <div className="flex flex-wrap gap-x-3 gap-y-1">
+                  {hromadas.map((s) => (
+                    <Link
+                      key={s.slug}
+                      href={`/hromada/${s.slug}`}
+                      className="text-sm text-zinc-400 underline-offset-2 hover:text-zinc-100 hover:underline"
+                    >
+                      {s.name_uk}
+                    </Link>
+                  ))}
+                </div>
+              </>
+            )}
+          </section>
+        )}
       </div>
 
       <script
