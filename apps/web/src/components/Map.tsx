@@ -58,22 +58,34 @@ const HROMADA_MIN_ZOOM = 7.5;
 // transparent so only regions with an active alert tint the map.
 const SUBREGION_FILL_PAINT: maplibregl.FillLayerSpecification["paint"] = {
   "fill-color": [
-    "match",
-    ["get", "state"],
-    "urban_fights", "#a855f7",
-    "artillery_shelling", "#f97316",
-    "air_raid", "#ef4444",
-    "#1f2937",
+    "case",
+    // Hovered region with no active alert → neutral sky highlight so it reads.
+    ["all", ["boolean", ["feature-state", "hover"], false], ["==", ["get", "state"], "safe"]],
+    "#38bdf8",
+    [
+      "match",
+      ["get", "state"],
+      "urban_fights", "#a855f7",
+      "artillery_shelling", "#f97316",
+      "air_raid", "#ef4444",
+      "#1f2937",
+    ],
   ],
+  // Hover bumps the fill so the region under the cursor is obvious, even when safe.
   "fill-opacity": [
-    "match",
-    ["get", "state"],
-    "urban_fights", 0.6,
-    "artillery_shelling", 0.55,
-    "air_raid", 0.5,
-    0,
+    "case",
+    ["boolean", ["feature-state", "hover"], false],
+    ["match", ["get", "state"], "urban_fights", 0.75, "artillery_shelling", 0.7, "air_raid", 0.65, 0.3],
+    ["match", ["get", "state"], "urban_fights", 0.6, "artillery_shelling", 0.55, "air_raid", 0.5, 0],
   ],
 };
+
+// Shared line paint for sub-region outlines — brighter + thicker on hover.
+const SUBREGION_LINE_PAINT = (base: number): maplibregl.LineLayerSpecification["paint"] => ({
+  "line-color": ["case", ["boolean", ["feature-state", "hover"], false], "#7dd3fc", "#52525b"],
+  "line-width": ["case", ["boolean", ["feature-state", "hover"], false], 2, base],
+  "line-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 1, 0.85],
+});
 
 const SHELTERS_SOURCE = "shelters";
 const SHELTERS_CLUSTER_LAYER = "shelters-cluster";
@@ -196,6 +208,7 @@ export function Map() {
   const hromadasGeoRef = useRef<GeoJSON.FeatureCollection | null>(null);
   const hromadasAddedRef = useRef(false);
   const oblastLabelsRef = useRef<GeoJSON.FeatureCollection | null>(null);
+  const hoverRef = useRef<{ source: string; id: number | string } | null>(null);
   const [maxWeight, setMaxWeight] = useState(1);
 
   const setHeatmapData = useCallback((fc: GeoJSON.FeatureCollection) => {
@@ -393,7 +406,8 @@ export function Map() {
         const raions = (await rResp.json()) as GeoJSON.FeatureCollection;
         if (cancelled) return;
         raionsGeoRef.current = raions;
-        map.addSource(RAIONS_SOURCE, { type: "geojson", data: raions });
+        // generateId lets us drive the hover highlight via feature-state.
+        map.addSource(RAIONS_SOURCE, { type: "geojson", data: raions, generateId: true });
         map.addLayer(
           {
             id: RAIONS_FILL,
@@ -411,7 +425,7 @@ export function Map() {
             type: "line",
             source: RAIONS_SOURCE,
             minzoom: RAION_MIN_ZOOM,
-            paint: { "line-color": "#3f3f46", "line-width": 0.6, "line-opacity": 0.8 },
+            paint: SUBREGION_LINE_PAINT(0.7),
           },
           LINE_LAYER,
         );
@@ -758,10 +772,31 @@ export function Map() {
         className: "deshahed-popup",
         offset: 8,
       });
+      // Feature-state hover highlight — clears the previous region, lights up
+      // the one under the cursor (works across the raion + hromada sources).
+      const setHover = (source: string, id: number | string | undefined) => {
+        const prev = hoverRef.current;
+        if (prev && (prev.source !== source || prev.id !== id)) {
+          map.setFeatureState({ source: prev.source, id: prev.id }, { hover: false });
+          hoverRef.current = null;
+        }
+        if (id !== undefined) {
+          map.setFeatureState({ source, id }, { hover: true });
+          hoverRef.current = { source, id };
+        }
+      };
+      const clearHover = () => {
+        const prev = hoverRef.current;
+        if (prev) map.setFeatureState({ source: prev.source, id: prev.id }, { hover: false });
+        hoverRef.current = null;
+      };
+
       const onSubMove = (e: maplibregl.MapLayerMouseEvent) => {
         if (cancelled || !e.features || e.features.length === 0) return;
         map.getCanvas().style.cursor = "pointer";
-        const p = (e.features[0].properties ?? {}) as { name_uk?: string; mkey?: string };
+        const feat = e.features[0];
+        setHover(feat.source, feat.id);
+        const p = (feat.properties ?? {}) as { name_uk?: string; mkey?: string };
         const states = selectSubRegionStates(useAlertsStore.getState());
         const sr = p.mkey ? states.get(p.mkey) : undefined;
         const meta = sr ? STATE_LABELS[sr.state] : null;
@@ -783,6 +818,7 @@ export function Map() {
       const onSubLeave = () => {
         map.getCanvas().style.cursor = "";
         subPopup.remove();
+        clearHover();
       };
       map.on("mousemove", RAIONS_FILL, onSubMove);
       map.on("mouseleave", RAIONS_FILL, onSubLeave);
@@ -797,7 +833,7 @@ export function Map() {
           const hromadas = (await hResp.json()) as GeoJSON.FeatureCollection;
           if (cancelled || map.getSource(HROMADAS_SOURCE)) return;
           hromadasGeoRef.current = hromadas;
-          map.addSource(HROMADAS_SOURCE, { type: "geojson", data: hromadas });
+          map.addSource(HROMADAS_SOURCE, { type: "geojson", data: hromadas, generateId: true });
           map.addLayer(
             {
               id: HROMADAS_FILL,
@@ -814,7 +850,7 @@ export function Map() {
               type: "line",
               source: HROMADAS_SOURCE,
               minzoom: HROMADA_MIN_ZOOM,
-              paint: { "line-color": "#3f3f46", "line-width": 0.4, "line-opacity": 0.6 },
+              paint: SUBREGION_LINE_PAINT(0.5),
             },
             LINE_LAYER,
           );
