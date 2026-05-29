@@ -42,7 +42,7 @@ export function AviationBanner() {
 
   return (
     <div
-      className="pointer-events-none absolute left-1/2 top-3 z-30 flex w-[min(720px,calc(100vw-2rem))] -translate-x-1/2 flex-col gap-1.5"
+      className="pointer-events-none absolute left-1/2 top-[calc(var(--safe-top)+0.75rem)] z-30 flex w-[min(720px,calc(100vw-7rem))] -translate-x-1/2 flex-col gap-1.5"
       aria-live="polite"
     >
       {items.map((ev) => (

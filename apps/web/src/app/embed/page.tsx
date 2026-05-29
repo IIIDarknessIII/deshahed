@@ -34,7 +34,7 @@ export default function EmbedDocsPage() {
   };
 
   return (
-    <main className="mx-auto min-h-screen max-w-3xl space-y-6 px-4 py-8 text-zinc-100">
+    <main className="mx-auto min-h-dvh max-w-3xl space-y-6 px-4 py-8 pt-[max(2rem,var(--safe-top))] pb-[max(2rem,var(--safe-bottom))] text-zinc-100">
       <header>
         <Link href="/" className="text-xs text-zinc-500 hover:text-zinc-300">
           ← На карту
@@ -75,7 +75,7 @@ export default function EmbedDocsPage() {
 
       <section className="space-y-2">
         <div className="text-xs uppercase tracking-wide text-zinc-500">Прев'ю</div>
-        <div className="rounded-md border border-border bg-zinc-900 p-4">
+        <div className="overflow-x-auto rounded-md border border-border bg-zinc-900 p-4">
           <iframe
             key={url + size.label}
             src={url}

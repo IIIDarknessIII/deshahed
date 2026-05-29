@@ -7,6 +7,9 @@ export const viewport: Viewport = {
   themeColor: "#0a0a0b",
   width: "device-width",
   initialScale: 1,
+  // Let content extend under notches / home indicators; we pad with
+  // env(safe-area-inset-*) where it matters.
+  viewportFit: "cover",
 };
 
 export const metadata: Metadata = {

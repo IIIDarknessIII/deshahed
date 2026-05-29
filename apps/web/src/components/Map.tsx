@@ -152,6 +152,18 @@ export function Map() {
     });
     mapRef.current = map;
 
+    // Touch-friendly controls. Compass is hidden (we never rotate); the
+    // geolocate button lets users jump to their own region quickly.
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+    map.addControl(
+      new maplibregl.GeolocateControl({
+        positionOptions: { enableHighAccuracy: true },
+        trackUserLocation: true,
+        showUserLocation: true,
+      }),
+      "top-right",
+    );
+
     map.on("load", async () => {
       if (cancelled) return;
       const resp = await fetch("/geo/oblasts.geojson");

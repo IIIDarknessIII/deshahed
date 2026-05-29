@@ -21,8 +21,8 @@ export const metadata: Metadata = {
 
 export default function TimelapsePage() {
   return (
-    <main className="flex h-screen w-screen flex-col overflow-hidden bg-bg">
-      <header className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3">
+    <main className="flex h-dvh w-screen flex-col overflow-hidden bg-bg">
+      <header className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3 pt-[max(0.75rem,var(--safe-top))]">
         <Link
           href="/"
           className="inline-flex items-center gap-1 rounded p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"

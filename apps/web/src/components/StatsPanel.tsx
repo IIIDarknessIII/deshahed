@@ -9,6 +9,7 @@ import { PushSubscribe } from "@/components/PushSubscribe";
 import { AlertLegend } from "@/components/AlertLegend";
 import { SoundToggle } from "@/components/SoundToggle";
 import { ShelterToggle } from "@/components/ShelterToggle";
+import { Panel } from "@/components/Panel";
 
 const HEATMAP_PERIODS: { value: HeatmapPeriod; label: string }[] = [
   { value: "day", label: "Доба" },
@@ -31,27 +32,18 @@ function StatCard({ label, value }: { label: string; value: string }) {
 
 export function StatsPanel() {
   const { data, isLoading, isError } = useStatsSummary("day");
-  const mobileSheet = useUiStore((s) => s.mobileSheet);
   const setMobileSheet = useUiStore((s) => s.setMobileSheet);
   const heatmapOn = useUiStore((s) => s.heatmapOn);
   const setHeatmapOn = useUiStore((s) => s.setHeatmapOn);
   const heatmapPeriod = useUiStore((s) => s.heatmapPeriod);
   const setHeatmapPeriod = useUiStore((s) => s.setHeatmapPeriod);
-  const isMobileOpen = mobileSheet === "stats";
 
   const totalAlerts = data?.total_alerts ?? 0;
   const totalDurationMin = data?.total_duration_minutes ?? 0;
   const top3 = (data?.by_oblast ?? []).slice(0, 3);
 
   return (
-    <aside
-      className={
-        "flex flex-col overflow-hidden border-border bg-bg/95 backdrop-blur transition-transform duration-300 " +
-        "md:relative md:h-full md:w-80 md:shrink-0 md:border-l md:translate-y-0 " +
-        "fixed inset-x-0 bottom-0 z-40 h-[70vh] rounded-t-xl border " +
-        (isMobileOpen ? "translate-y-0" : "translate-y-full md:translate-y-0")
-      }
-    >
+    <Panel side="right" sheet="stats">
       <header className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
         <div>
           <div className="text-base font-semibold text-zinc-100">Статистика</div>
@@ -60,7 +52,7 @@ export function StatsPanel() {
         <div className="flex items-center gap-1">
           <Link
             href="/stats"
-            className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+            className="flex h-9 w-9 items-center justify-center rounded text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
             aria-label="Детальна статистика"
             title="Детальна статистика"
           >
@@ -69,15 +61,15 @@ export function StatsPanel() {
           <button
             type="button"
             onClick={() => setMobileSheet(null)}
-            className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 md:hidden"
+            className="-mr-1 flex h-9 w-9 items-center justify-center rounded text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 md:hidden"
             aria-label="Закрити"
           >
-            <X size={18} />
+            <X size={20} />
           </button>
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto overscroll-contain pb-[var(--safe-bottom)]">
       <div className="space-y-2.5 px-4 py-3">
         <StatCard label="Всього тривог" value={String(totalAlerts)} />
         <StatCard
@@ -181,6 +173,6 @@ export function StatsPanel() {
         </ul>
       </div>
       </div>
-    </aside>
+    </Panel>
   );
 }

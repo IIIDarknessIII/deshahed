@@ -83,14 +83,18 @@ export function HistoryModal() {
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-[2px] md:items-center md:p-4"
       onClick={() => selectLocation(null)}
     >
       <div
-        className="w-full max-w-2xl overflow-hidden rounded-lg border border-border bg-bg shadow-2xl"
+        className="animate-sheet-up flex max-h-[88dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-border bg-bg shadow-2xl md:max-h-none md:rounded-lg"
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="flex items-center justify-between border-b border-border px-5 py-3">
+        {/* Grab-handle affordance on mobile. */}
+        <div className="shrink-0 pb-1 pt-2.5 md:hidden">
+          <div className="mx-auto h-1.5 w-10 rounded-full bg-zinc-700" />
+        </div>
+        <header className="flex shrink-0 items-center justify-between border-b border-border px-5 py-3">
           <div>
             <div className="text-base font-semibold text-zinc-100">{title}</div>
             <div className="text-xs text-zinc-500">Історія тривог</div>
@@ -98,21 +102,21 @@ export function HistoryModal() {
           <button
             type="button"
             onClick={() => selectLocation(null)}
-            className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+            className="-mr-1 flex h-9 w-9 items-center justify-center rounded text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
             aria-label="Закрити"
           >
-            <X size={18} />
+            <X size={20} />
           </button>
         </header>
 
-        <div className="flex items-center gap-2 border-b border-border px-5 py-2.5">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-5 py-2.5">
           {PERIODS.map((p) => (
             <button
               key={p.value}
               type="button"
               onClick={() => setPeriod(p.value)}
               className={
-                "rounded px-3 py-1 text-xs " +
+                "rounded px-3 py-1.5 text-xs " +
                 (period === p.value
                   ? "bg-zinc-100 text-zinc-900"
                   : "border border-border text-zinc-300 hover:border-zinc-600")
@@ -127,7 +131,7 @@ export function HistoryModal() {
           </div>
         </div>
 
-        <div className="h-64 px-3 py-3">
+        <div className="h-64 shrink-0 px-3 py-3 pb-[max(0.75rem,var(--safe-bottom))]">
           {isLoading && (
             <div className="flex h-full items-center justify-center text-sm text-zinc-500">
               Завантаження…

@@ -45,8 +45,8 @@ export default async function RegionPage({ params }: Props) {
   if (!region) notFound();
 
   return (
-    <main className="min-h-screen bg-bg">
-      <header className="sticky top-0 z-10 border-b border-border bg-bg/95 backdrop-blur">
+    <main className="min-h-dvh bg-bg">
+      <header className="sticky top-0 z-10 border-b border-border bg-bg/95 pt-[var(--safe-top)] backdrop-blur">
         <div className="mx-auto flex max-w-4xl items-center gap-3 px-4 py-3">
           <Link
             href="/"
@@ -62,7 +62,7 @@ export default async function RegionPage({ params }: Props) {
         </div>
       </header>
 
-      <div className="mx-auto max-w-4xl space-y-6 px-4 py-6">
+      <div className="mx-auto max-w-4xl space-y-6 px-4 py-6 pb-[max(1.5rem,var(--safe-bottom))]">
         <section className="rounded-md border border-border p-4">
           <h1 className="mb-2 text-xl font-semibold text-zinc-100">
             {region.full_name_uk} — повітряні тривоги

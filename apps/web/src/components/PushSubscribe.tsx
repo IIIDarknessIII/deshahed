@@ -9,11 +9,14 @@ type State = "checking" | "unsupported" | "disabled" | "denied" | "off" | "on" |
 
 const ALL_UA = "__all__"; // sentinel; null on the wire
 
-function urlBase64ToUint8Array(base64Url: string): Uint8Array {
+function urlBase64ToUint8Array(base64Url: string) {
   const padding = "=".repeat((4 - (base64Url.length % 4)) % 4);
   const base64 = (base64Url + padding).replace(/-/g, "+").replace(/_/g, "/");
   const raw = atob(base64);
-  const out = new Uint8Array(raw.length);
+  // Back the view with an explicit ArrayBuffer so the inferred type is
+  // Uint8Array<ArrayBuffer> — applicationServerKey rejects the looser
+  // ArrayBufferLike (which could be a SharedArrayBuffer).
+  const out = new Uint8Array(new ArrayBuffer(raw.length));
   for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
   return out;
 }

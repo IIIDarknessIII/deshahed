@@ -176,7 +176,7 @@ export function Timelapse() {
     <div className="flex h-full w-full flex-col">
       <div className="relative min-h-0 flex-1">
         <div ref={containerRef} className="absolute inset-0" />
-        <div className="pointer-events-none absolute left-3 top-3 rounded-md border border-border bg-bg/85 px-3 py-1.5 backdrop-blur">
+        <div className="pointer-events-none absolute left-3 top-[calc(var(--safe-top)+0.75rem)] rounded-md border border-border bg-bg/85 px-3 py-1.5 backdrop-blur">
           <div className="text-[11px] uppercase tracking-wide text-zinc-500">Час</div>
           <div className="font-mono text-base font-semibold text-zinc-100 tabular-nums">
             {currentTime ? formatTime(currentTime) : "—"}
@@ -187,8 +187,8 @@ export function Timelapse() {
         </div>
       </div>
 
-      <div className="shrink-0 border-t border-border bg-bg/95 px-3 py-3 backdrop-blur">
-        <div className="mb-2 flex items-center gap-2">
+      <div className="shrink-0 border-t border-border bg-bg/95 px-3 py-3 pb-[max(0.75rem,var(--safe-bottom))] backdrop-blur">
+        <div className="mb-2 flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => { setIdx(0); setPlaying(false); }}

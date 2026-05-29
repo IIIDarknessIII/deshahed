@@ -7,29 +7,19 @@ import { useUiStore } from "@/stores/uiStore";
 import { formatDuration } from "@/lib/format";
 import { alertTypeLabel } from "@/lib/labels";
 import { OnlineBadge } from "@/components/OnlineBadge";
+import { Panel } from "@/components/Panel";
 
 export function AlertsPanel() {
   const connected = useAlertsStore((s) => s.connected);
   // selectAlertsList returns a fresh Array each call; useShallow keeps the
   // hook stable when the alert set hasn't actually changed.
   const alerts = useAlertsStore(useShallow(selectAlertsList));
-  const mobileSheet = useUiStore((s) => s.mobileSheet);
   const setMobileSheet = useUiStore((s) => s.setMobileSheet);
-  const isMobileOpen = mobileSheet === "alerts";
   const now = Date.now();
 
   return (
-    <aside
-      className={
-        "flex flex-col border-border bg-bg/95 backdrop-blur transition-transform duration-300 " +
-        // Desktop: left static sidebar
-        "md:relative md:h-full md:w-80 md:shrink-0 md:border-r md:translate-y-0 " +
-        // Mobile: bottom sheet
-        "fixed inset-x-0 bottom-0 z-40 h-[70vh] rounded-t-xl border " +
-        (isMobileOpen ? "translate-y-0" : "translate-y-full md:translate-y-0")
-      }
-    >
-      <header className="flex items-center justify-between border-b border-border px-4 py-3">
+    <Panel side="left" sheet="alerts">
+      <header className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
         <div>
           <div className="text-base font-semibold text-zinc-100">deshahed</div>
           <div className="text-xs text-zinc-500">карта тривог</div>
@@ -46,19 +36,19 @@ export function AlertsPanel() {
           <button
             type="button"
             onClick={() => setMobileSheet(null)}
-            className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 md:hidden"
+            className="-mr-1 flex h-9 w-9 items-center justify-center rounded text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 md:hidden"
             aria-label="Закрити"
           >
-            <X size={18} />
+            <X size={20} />
           </button>
         </div>
       </header>
 
-      <div className="px-4 py-3 text-xs uppercase tracking-wide text-zinc-500">
+      <div className="shrink-0 px-4 py-3 text-xs uppercase tracking-wide text-zinc-500">
         Активних тривог: {alerts.length}
       </div>
 
-      <ul className="flex-1 overflow-y-auto">
+      <ul className="flex-1 overflow-y-auto overscroll-contain">
         {alerts.length === 0 ? (
           <li className="px-4 py-6 text-sm text-zinc-500">
             Зараз тривог немає.
@@ -73,7 +63,7 @@ export function AlertsPanel() {
                 <div className="truncate text-sm text-zinc-100">
                   {a.location_title}
                 </div>
-                <div className="shrink-0 text-xs text-alert-active">
+                <div className="shrink-0 text-xs text-alert-active tabular-nums">
                   {formatDuration(now - +new Date(a.started_at))}
                 </div>
               </div>
@@ -83,10 +73,10 @@ export function AlertsPanel() {
         )}
       </ul>
 
-      <footer className="border-t border-border px-4 py-3 text-[11px] leading-snug text-zinc-500">
+      <footer className="shrink-0 border-t border-border px-4 py-3 pb-[max(0.75rem,var(--safe-bottom))] text-[11px] leading-snug text-zinc-500">
         Дані з відкритих джерел (OSINT). Не використовуйте для прийняття рішень
         про безпеку. Офіційне джерело — застосунок «Повітряна тривога».
       </footer>
-    </aside>
+    </Panel>
   );
 }

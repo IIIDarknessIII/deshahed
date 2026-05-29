@@ -102,6 +102,10 @@ export const api = {
   statsComparison: () => get<ComparisonResponse>("/api/v1/stats/comparison"),
   alertsHistory: (location_uid: number, period: Period) =>
     get<HistoryResponse>(`/api/v1/alerts/history?location_uid=${location_uid}&period=${period}`),
+  alertsHistoryByOblast: (oblast: string, period: Period) =>
+    get<HistoryResponse>(
+      `/api/v1/alerts/history?oblast=${encodeURIComponent(oblast)}&period=${period}`,
+    ),
   heatmap: (period: Period, type: HeatmapType) =>
     get<HeatmapResponse>(`/api/v1/heatmap?period=${period}&type=${type}`),
 };

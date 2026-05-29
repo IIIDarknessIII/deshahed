@@ -20,9 +20,9 @@ export default function StatsPage() {
   const [period, setPeriod] = useState<Period>("week");
 
   return (
-    <main className="min-h-screen bg-bg">
-      <header className="sticky top-0 z-10 border-b border-border bg-bg/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+    <main className="min-h-dvh bg-bg">
+      <header className="sticky top-0 z-10 border-b border-border bg-bg/95 pt-[var(--safe-top)] backdrop-blur">
+        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <Link
               href="/"
@@ -36,14 +36,14 @@ export default function StatsPage() {
               <div className="text-xs text-zinc-500">deshahed</div>
             </div>
           </div>
-          <div className="flex gap-1.5">
+          <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {PERIODS.map((p) => (
               <button
                 key={p.value}
                 type="button"
                 onClick={() => setPeriod(p.value)}
                 className={
-                  "rounded px-2.5 py-1 text-xs " +
+                  "shrink-0 rounded px-3 py-1.5 text-xs " +
                   (period === p.value
                     ? "bg-zinc-100 text-zinc-900"
                     : "border border-border text-zinc-300 hover:border-zinc-600")
@@ -56,7 +56,7 @@ export default function StatsPage() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-6xl space-y-6 px-4 py-6">
+      <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 pb-[max(1.5rem,var(--safe-bottom))]">
         <Comparison />
 
         <section className="rounded-md border border-border p-4">
