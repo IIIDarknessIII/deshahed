@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Film, Flame, Heart, LineChart, Smartphone, X } from "lucide-react";
+import { Film, Flame, Heart, Info, LineChart, Smartphone, X } from "lucide-react";
 import { SUPPORT_URL } from "@/lib/links";
 import { useStatsSummary } from "@/hooks/useStats";
 import { useUiStore, type HeatmapPeriod } from "@/stores/uiStore";
@@ -108,6 +108,18 @@ export function StatsPanel() {
           </span>
           <span className="text-[10px] uppercase tracking-wide">monobank</span>
         </a>
+
+        <Link
+          href="/about"
+          className="flex w-full items-center justify-between rounded-md border border-border px-3 py-2 text-sm text-zinc-300 transition hover:border-zinc-600"
+          title="Джерела даних і методологія"
+        >
+          <span className="flex items-center gap-2">
+            <Info size={14} />
+            Про проєкт і джерела
+          </span>
+          <span className="text-[10px] uppercase tracking-wide">відкрити</span>
+        </Link>
 
         {/* Desktop-only note — phone users get the install banner instead. */}
         <div className="hidden items-start gap-2 rounded-md border border-border bg-bg/60 px-3 py-2 text-[11px] leading-snug text-zinc-400 md:flex">
