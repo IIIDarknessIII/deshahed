@@ -548,31 +548,33 @@ export function Map() {
         },
         DRONE_TRACKS_LAYER,
       );
+      // Trajectory head — the type silhouette (rocket / shahed / …) at the
+      // leading end, rotated to the track's heading. Previously a plain circle.
       map.addLayer(
         {
           id: TRAJECTORIES_HEAD_LAYER,
-          type: "circle",
+          type: "symbol",
           source: TRAJECTORIES_SOURCE,
           filter: ["==", ["geometry-type"], "Point"],
-          paint: {
-            "circle-radius": [
-              "interpolate", ["linear"], ["zoom"],
-              4, 9,
-              6, 7,
-              8, 6,
-            ],
-            "circle-color": [
+          layout: {
+            "icon-image": [
               "match",
               ["get", "event_type"],
-              "shahed", "#fb923c",
-              "missile", "#dc2626",
-              "kab", "#a855f7",
-              "aviation", "#38bdf8",
-              "#9ca3af",
+              "shahed", "drone-shahed",
+              "missile", "drone-missile",
+              "kab", "drone-kab",
+              "aviation", "drone-aviation",
+              "drone-shahed",
             ],
-            "circle-stroke-color": "#0a0a0b",
-            "circle-stroke-width": 1.6,
-            "circle-opacity": 0.95,
+            "icon-size": [
+              "interpolate", ["linear"], ["zoom"],
+              4, 1.4,
+              6, 1.1,
+              8, 0.9,
+            ],
+            "icon-allow-overlap": true,
+            "icon-rotation-alignment": "map",
+            "icon-rotate": ["coalesce", ["get", "bearing"], 0],
           },
         },
         DRONES_POINT_LAYER,
@@ -1004,6 +1006,14 @@ export function Map() {
             },
           });
         }
+        // Heading from the last path segment, so the head icon faces forward.
+        let bearing = 0;
+        if (t.path && t.path.coordinates.length >= 2) {
+          const c = t.path.coordinates;
+          const [lon1, lat1] = c[c.length - 2];
+          const [lon2, lat2] = c[c.length - 1];
+          bearing = bearingDeg(lat1, lon1, lat2, lon2);
+        }
         // Head marker (always — gives a point even for single-point tracks).
         features.push({
           type: "Feature",
@@ -1013,6 +1023,7 @@ export function Map() {
             event_type: t.event_type,
             point_count: t.point_count,
             head: true,
+            bearing,
           },
         });
       }
