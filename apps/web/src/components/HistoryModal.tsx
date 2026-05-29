@@ -11,7 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { useHistory } from "@/hooks/useHistory";
+import { useHistoryByOblast } from "@/hooks/useHistory";
 import { useUiStore } from "@/stores/uiStore";
 import { TITLE_BY_UID } from "@/lib/locations";
 import { type HistoryItem, type Period } from "@/lib/api";
@@ -61,7 +61,12 @@ export function HistoryModal() {
   const selectLocation = useUiStore((s) => s.selectLocation);
   const [period, setPeriod] = useState<Period>("week");
 
-  const { data, isLoading, isError } = useHistory(selectedUid, period);
+  // The Map click handler hands us alerts.in.ua's synthetic oblast UID from
+  // lib/locations, but alert_events.location_uid in our DB carries the
+  // sub-region UID alerts.in.ua actually fires at. Match by the canonical
+  // oblast TITLE string instead — same approach the choropleth uses.
+  const oblast = selectedUid !== null ? TITLE_BY_UID[selectedUid] ?? null : null;
+  const { data, isLoading, isError } = useHistoryByOblast(oblast, period);
 
   const buckets = useMemo(
     () => (data ? bucketByDay(data.items, period) : []),
@@ -70,7 +75,7 @@ export function HistoryModal() {
 
   if (selectedUid === null) return null;
 
-  const title = TITLE_BY_UID[selectedUid] ?? `UID ${selectedUid}`;
+  const title = oblast ?? `UID ${selectedUid}`;
   const totalItems = data?.items.length ?? 0;
   const totalDurationMin = buckets.reduce((acc, b) => acc + b.durationMin, 0);
 
