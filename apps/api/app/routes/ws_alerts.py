@@ -10,6 +10,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
+import uuid
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -22,6 +24,14 @@ router = APIRouter(prefix="/api/v1/ws", tags=["ws"])
 
 REDIS_KEY_CURRENT = "alerts:current"
 REDIS_CHANNEL_UPDATES = "alerts:updates"
+
+# Live-presence sorted set, member=connection_uuid, score=last_seen epoch.
+# Stale entries (>60s) are swept either by the /stats/online endpoint or by
+# the heartbeat task below. Designed so a hard kill never leaves zombies for
+# more than one minute.
+REDIS_KEY_ONLINE = "online:sessions"
+PRESENCE_TTL_SEC = 60
+PRESENCE_REFRESH_SEC = 25
 
 
 async def _load_snapshot() -> list[dict]:
@@ -46,9 +56,26 @@ async def ws_alerts(ws: WebSocket) -> None:
     await ws.accept()
     log.info("ws_alerts: accepted client=%s", client)
 
-    pubsub = get_redis().pubsub()
+    redis = get_redis()
+    pubsub = redis.pubsub()
     forward_task: asyncio.Task[None] | None = None
+    presence_task: asyncio.Task[None] | None = None
+    connection_id = uuid.uuid4().hex
+
+    async def presence_heartbeat() -> None:
+        # Re-score every 25s so a stuck connection that beats receive_text's
+        # disconnect detection still ages out within 60s after death.
+        while True:
+            try:
+                await redis.zadd(REDIS_KEY_ONLINE, {connection_id: time.time()})
+            except Exception:
+                log.exception("presence zadd failed")
+            await asyncio.sleep(PRESENCE_REFRESH_SEC)
+
     try:
+        await redis.zadd(REDIS_KEY_ONLINE, {connection_id: time.time()})
+        presence_task = asyncio.create_task(presence_heartbeat())
+
         snapshot = await _load_snapshot()
         await ws.send_json({"type": "snapshot", "alerts": snapshot})
         log.info("ws_alerts: snapshot sent client=%s (%d alerts)", client, len(snapshot))
@@ -71,7 +98,6 @@ async def ws_alerts(ws: WebSocket) -> None:
 
         forward_task = asyncio.create_task(forward())
 
-        # Drain client-side frames so a client disconnect is detected promptly.
         while True:
             await ws.receive_text()
 
@@ -82,6 +108,12 @@ async def ws_alerts(ws: WebSocket) -> None:
     finally:
         if forward_task is not None:
             forward_task.cancel()
+        if presence_task is not None:
+            presence_task.cancel()
+        try:
+            await redis.zrem(REDIS_KEY_ONLINE, connection_id)
+        except Exception:
+            log.exception("presence zrem failed")
         try:
             await pubsub.unsubscribe(REDIS_CHANNEL_UPDATES)
             await pubsub.aclose()

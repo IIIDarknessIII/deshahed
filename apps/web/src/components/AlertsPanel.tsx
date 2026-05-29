@@ -6,6 +6,7 @@ import { useAlertsStore, selectAlertsList } from "@/stores/alertsStore";
 import { useUiStore } from "@/stores/uiStore";
 import { formatDuration } from "@/lib/format";
 import { alertTypeLabel } from "@/lib/labels";
+import { OnlineBadge } from "@/components/OnlineBadge";
 
 export function AlertsPanel() {
   const connected = useAlertsStore((s) => s.connected);
@@ -34,6 +35,7 @@ export function AlertsPanel() {
           <div className="text-xs text-zinc-500">карта тривог</div>
         </div>
         <div className="flex items-center gap-2">
+          <OnlineBadge />
           <span
             className={
               "inline-flex h-2.5 w-2.5 rounded-full " +
