@@ -26,6 +26,13 @@ const DRONES_SOURCE = "drones";
 const DRONES_POINT_LAYER = "drones-point";
 const DRONE_TRACKS_SOURCE = "drone-tracks";
 const DRONE_TRACKS_LAYER = "drone-tracks";
+const DRONE_ARROWS_SOURCE = "drone-arrows";
+const DRONE_ARROWS_LAYER = "drone-arrows";
+
+// Threat-type markers placed at region centroids (currently artillery-shelling
+// on oblasts). Driven by the oblast aggregate + the one-point-per-oblast source.
+const THREAT_ICONS_SOURCE = "threat-icons";
+const THREAT_ICONS_LAYER = "threat-icons";
 
 const TRAJECTORIES_SOURCE = "trajectories";
 const TRAJECTORIES_LINE_LAYER = "trajectories-line";
@@ -81,8 +88,11 @@ function readSubscribedOblast(): string | null {
   return localStorage.getItem(PUSH_REGION_LS_KEY);
 }
 
+// All icons are drawn nose-up (pointing north); the point layer rotates them
+// by the event's computed bearing so they face where the object is heading.
+
 // Delta-wing silhouette mimicking a shahed-style UAV; a tinted dot marks
-// the warhead. We embed one variant per event_type to keep them colour-coded.
+// the warhead.
 function droneSvg(fill: string): string {
   return `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
@@ -92,12 +102,59 @@ function droneSvg(fill: string): string {
     </svg>`;
 }
 
+// Slender rocket/missile silhouette (body + nose cone + tail fins + flame) so
+// a missile reads instantly differently from a shahed.
+function missileSvg(fill: string): string {
+  return `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+      <path d="M16 2 C20 7 20.5 12 20.5 17 L20.5 23 L11.5 23 L11.5 17 C11.5 12 12 7 16 2 Z"
+            fill="${fill}" stroke="#0a0a0b" stroke-width="1.4" stroke-linejoin="round"/>
+      <path d="M11.5 19 L6.5 26 L11.5 23 Z" fill="${fill}" stroke="#0a0a0b" stroke-width="1.1" stroke-linejoin="round"/>
+      <path d="M20.5 19 L25.5 26 L20.5 23 Z" fill="${fill}" stroke="#0a0a0b" stroke-width="1.1" stroke-linejoin="round"/>
+      <path d="M13.5 23 L16 30 L18.5 23 Z" fill="#fde047" stroke="#0a0a0b" stroke-width="0.6" stroke-linejoin="round"/>
+    </svg>`;
+}
+
+// Chevron arrowhead, nose-up — dropped at the projected impact point to make
+// the direction of travel explicit.
+function arrowSvg(fill: string): string {
+  return `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+      <path d="M16 5 L26 25 L16 19 L6 25 Z"
+            fill="${fill}" stroke="#0a0a0b" stroke-width="1.4" stroke-linejoin="round"/>
+    </svg>`;
+}
+
+// Star-burst marking a region under artillery-shelling threat.
+function artillerySvg(): string {
+  return `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+      <path d="M16 3 L19 12 L28 9 L21 16 L28 23 L19 20 L16 29 L13 20 L4 23 L11 16 L4 9 L13 12 Z"
+            fill="#f97316" stroke="#0a0a0b" stroke-width="1.3" stroke-linejoin="round"/>
+      <circle cx="16" cy="16" r="3" fill="#fde047" stroke="#0a0a0b" stroke-width="0.8"/>
+    </svg>`;
+}
+
 const DRONE_ICONS: Record<string, string> = {
   "drone-shahed": droneSvg("#fb923c"),
-  "drone-missile": droneSvg("#dc2626"),
+  "drone-missile": missileSvg("#dc2626"),
   "drone-kab": droneSvg("#a855f7"),
   "drone-aviation": droneSvg("#38bdf8"),
+  "dir-arrow": arrowSvg("#fca5a5"),
+  "threat-artillery": artillerySvg(),
 };
+
+// Great-circle bearing in degrees (0 = north, clockwise) from A to B —
+// used to rotate the icons toward each object's projected direction.
+function bearingDeg(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const φ1 = toRad(lat1);
+  const φ2 = toRad(lat2);
+  const Δλ = toRad(lon2 - lon1);
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
 
 function svgToImage(svg: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -138,6 +195,7 @@ export function Map() {
   const raionsGeoRef = useRef<GeoJSON.FeatureCollection | null>(null);
   const hromadasGeoRef = useRef<GeoJSON.FeatureCollection | null>(null);
   const hromadasAddedRef = useRef(false);
+  const oblastLabelsRef = useRef<GeoJSON.FeatureCollection | null>(null);
   const [maxWeight, setMaxWeight] = useState(1);
 
   const setHeatmapData = useCallback((fc: GeoJSON.FeatureCollection) => {
@@ -271,10 +329,12 @@ export function Map() {
       // Oblast names from a dedicated one-point-per-oblast source (avoids the
       // duplicate labels MultiPolygon parts produce). Cyrillic glyphs come from
       // the demotiles CDN declared on STYLE.glyphs.
-      map.addSource(OBLAST_LABELS_SOURCE, {
-        type: "geojson",
-        data: "/geo/oblast_labels.geojson",
-      });
+      const olResp = await fetch("/geo/oblast_labels.geojson");
+      if (cancelled) return;
+      const oblastLabels = (await olResp.json()) as GeoJSON.FeatureCollection;
+      if (cancelled) return;
+      oblastLabelsRef.current = oblastLabels;
+      map.addSource(OBLAST_LABELS_SOURCE, { type: "geojson", data: oblastLabels });
       map.addLayer({
         id: LABEL_LAYER,
         type: "symbol",
@@ -299,6 +359,27 @@ export function Map() {
           "text-halo-color": "#0a0a0b",
           "text-halo-width": 1.4,
           "text-halo-blur": 0.4,
+        },
+      });
+
+      // Artillery-threat markers — a star-burst at the centroid of every oblast
+      // whose aggregate state is artillery_shelling (rebuilt in applyThreatIcons).
+      map.addSource(THREAT_ICONS_SOURCE, {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+      });
+      map.addLayer({
+        id: THREAT_ICONS_LAYER,
+        type: "symbol",
+        source: THREAT_ICONS_SOURCE,
+        layout: {
+          "icon-image": ["get", "icon"],
+          "icon-size": ["interpolate", ["linear"], ["zoom"], 4, 0.6, 7, 0.85],
+          "icon-allow-overlap": true,
+          "icon-ignore-placement": true,
+          "icon-anchor": "bottom",
+          // Sit just above the oblast name (shares its anchor point).
+          "icon-offset": [0, -14],
         },
       });
 
@@ -370,6 +451,10 @@ export function Map() {
         type: "geojson",
         data: { type: "FeatureCollection", features: [] },
       });
+      map.addSource(DRONE_ARROWS_SOURCE, {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+      });
 
       await registerDroneIcons(map);
 
@@ -416,6 +501,22 @@ export function Map() {
           ],
           "icon-allow-overlap": true,
           "icon-rotation-alignment": "map",
+          // Point the silhouette toward its projected direction when known.
+          "icon-rotate": ["coalesce", ["get", "bearing"], 0],
+        },
+      });
+
+      // Arrowhead at the projected impact point — an explicit "flies to here".
+      map.addLayer({
+        id: DRONE_ARROWS_LAYER,
+        type: "symbol",
+        source: DRONE_ARROWS_SOURCE,
+        layout: {
+          "icon-image": "dir-arrow",
+          "icon-size": ["interpolate", ["linear"], ["zoom"], 4, 0.7, 8, 0.5],
+          "icon-allow-overlap": true,
+          "icon-rotation-alignment": "map",
+          "icon-rotate": ["coalesce", ["get", "bearing"], 0],
         },
       });
 
@@ -755,6 +856,32 @@ export function Map() {
           | undefined;
         src?.setData(geo);
       }
+      applyThreatIcons();
+    };
+
+    // Place an artillery-burst marker at the centroid of each oblast whose
+    // aggregate state is artillery_shelling (escalated from its raions too).
+    const applyThreatIcons = () => {
+      const m = mapRef.current;
+      const labels = oblastLabelsRef.current;
+      if (!m || !labels) return;
+      const aggregates = selectOblastAggregate(useAlertsStore.getState());
+      const feats: GeoJSON.Feature[] = [];
+      for (const f of labels.features) {
+        const title = (f.properties as { full_name_uk?: string } | null)?.full_name_uk;
+        const agg = title ? aggregates.get(title) : undefined;
+        if (agg && agg.state === "artillery_shelling") {
+          feats.push({
+            type: "Feature",
+            geometry: f.geometry,
+            properties: { icon: "threat-artillery", title },
+          });
+        }
+      }
+      (m.getSource(THREAT_ICONS_SOURCE) as maplibregl.GeoJSONSource | undefined)?.setData({
+        type: "FeatureCollection",
+        features: feats,
+      });
     };
 
     // Repaint raion + hromada fills from their own alert state, matched by the
@@ -795,35 +922,64 @@ export function Map() {
       const tracksSrc = m.getSource(DRONE_TRACKS_SOURCE) as
         | maplibregl.GeoJSONSource
         | undefined;
-      if (!src || !tracksSrc) return;
+      const arrowsSrc = m.getSource(DRONE_ARROWS_SOURCE) as
+        | maplibregl.GeoJSONSource
+        | undefined;
+      if (!src || !tracksSrc || !arrowsSrc) return;
       const drones = Array.from(useDronesStore.getState().drones.values());
+
+      const bearingOf = (d: DroneEvent): number =>
+        d.direction_lat !== null && d.direction_lon !== null
+          ? bearingDeg(d.location_lat, d.location_lon, d.direction_lat, d.direction_lon)
+          : 0;
+
       src.setData({
         type: "FeatureCollection",
         features: drones.map(
           (d: DroneEvent): GeoJSON.Feature => ({
             type: "Feature",
             geometry: { type: "Point", coordinates: [d.location_lon, d.location_lat] },
-            properties: { id: d.id, event_type: d.event_type, confidence: d.confidence },
+            properties: {
+              id: d.id,
+              event_type: d.event_type,
+              confidence: d.confidence,
+              bearing: bearingOf(d),
+            },
           }),
         ),
       });
+
+      const withDir = drones.filter(
+        (d) => d.direction_lat !== null && d.direction_lon !== null,
+      );
       tracksSrc.setData({
         type: "FeatureCollection",
-        features: drones
-          .filter((d) => d.direction_lat !== null && d.direction_lon !== null)
-          .map(
-            (d): GeoJSON.Feature => ({
-              type: "Feature",
-              geometry: {
-                type: "LineString",
-                coordinates: [
-                  [d.location_lon, d.location_lat],
-                  [d.direction_lon as number, d.direction_lat as number],
-                ],
-              },
-              properties: { id: d.id, event_type: d.event_type },
-            }),
-          ),
+        features: withDir.map(
+          (d): GeoJSON.Feature => ({
+            type: "Feature",
+            geometry: {
+              type: "LineString",
+              coordinates: [
+                [d.location_lon, d.location_lat],
+                [d.direction_lon as number, d.direction_lat as number],
+              ],
+            },
+            properties: { id: d.id, event_type: d.event_type },
+          }),
+        ),
+      });
+      arrowsSrc.setData({
+        type: "FeatureCollection",
+        features: withDir.map(
+          (d): GeoJSON.Feature => ({
+            type: "Feature",
+            geometry: {
+              type: "Point",
+              coordinates: [d.direction_lon as number, d.direction_lat as number],
+            },
+            properties: { id: d.id, event_type: d.event_type, bearing: bearingOf(d) },
+          }),
+        ),
       });
     };
 
