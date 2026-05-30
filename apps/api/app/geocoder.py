@@ -179,6 +179,52 @@ async def resolve_nominatim(
             await client.aclose()
 
 
+# ---------- Oblast-level fallback ----------
+
+# Directional / colloquial phrases that name an oblast but no settlement
+# ("схід Дніпропетровщини", "межі Харківщини і Сумщини", "північ Полтавщини")
+# resolve to that oblast's centroid with low confidence, so the threat still
+# appears on the map (approximately) instead of being dropped. Stems are
+# already normalize()'d (lowercased, hyphens/apostrophes stripped) so they can
+# be substring-matched against a normalized query.
+OBLAST_FALLBACK: list[tuple[tuple[str, ...], float, float]] = [
+    (("вінниччин", "вінницьк"), 48.9785, 28.5489),
+    (("волинщин", "волинськ", "волинь", "волині"), 51.1381, 24.9369),
+    (("дніпропетровщин", "дніпропетровськ"), 48.2969, 35.1864),
+    (("донеччин", "донецьк"), 48.0628, 37.8485),
+    (("житомирщин", "житомирськ"), 50.6430, 28.3635),
+    (("закарпатт", "закарпатськ"), 48.4978, 23.0282),
+    (("запоріжж", "запорізьк"), 47.0953, 35.7598),
+    (("іванофранківщин", "іванофранківськ", "прикарпатт"), 48.6384, 24.6766),
+    (("київщин", "київська обл", "київської обл"), 50.3541, 31.4077),
+    (("кіровоградщин", "кіровоградськ"), 48.4860, 31.8346),
+    (("луганщин", "луганськ"), 48.9520, 38.9068),
+    (("львівщин", "львівськ"), 49.6925, 23.8913),
+    (("миколаївщин", "миколаївськ"), 47.4087, 31.9646),
+    (("одещин", "одеськ"), 46.7309, 30.5821),
+    (("полтавщин", "полтавськ"), 49.6238, 34.1095),
+    (("рівненщин", "рівненськ"), 50.9849, 26.6484),
+    (("сумщин", "сумськ"), 51.2294, 33.8669),
+    (("тернопільщин", "тернопільськ"), 49.3925, 25.4907),
+    (("харківщин", "харківськ"), 49.4868, 36.6841),
+    (("херсонщин", "херсонськ"), 46.7394, 33.4823),
+    (("хмельниччин", "хмельницьк"), 49.5209, 26.9424),
+    (("черкащин", "черкаськ"), 49.3370, 31.6360),
+    (("буковин", "чернівеччин", "чернівецьк"), 48.2011, 25.7734),
+    (("чернігівщин", "чернігівськ"), 51.3504, 31.8618),
+]
+
+
+def resolve_oblast_fallback(query: str) -> GeocodingResult | None:
+    q = normalize(query)
+    if not q:
+        return None
+    for stems, lat, lon in OBLAST_FALLBACK:
+        if any(st in q for st in stems):
+            return GeocodingResult(lat=lat, lon=lon, source="local", confidence="low")
+    return None
+
+
 # ---------- Top-level resolver with caching ----------
 
 async def resolve(
@@ -195,10 +241,22 @@ async def resolve(
     )
     c = cached.scalar_one_or_none()
     if c is not None:
+        if c.lat is not None:
+            return GeocodingResult(lat=c.lat, lon=c.lon, source=c.source, confidence=c.confidence)
+        # Cached negative — retry the oblast fallback before honoring the miss
+        # (covers directional phrases poisoned into the cache earlier).
+        ob = resolve_oblast_fallback(query)
+        if ob is not None:
+            return ob
         return GeocodingResult(lat=c.lat, lon=c.lon, source=c.source, confidence=c.confidence)
 
-    # L1
+    # L1 — settlements
     result = await resolve_local(query, session)
+    # Oblast-level fallback — prefer the oblast centroid over a fuzzy remote guess.
+    if result is None or not result.found:
+        ob = resolve_oblast_fallback(query)
+        if ob is not None:
+            result = ob
     if result is None or not result.found:
         # L2 (unless explicitly disabled — useful for unit tests)
         if not skip_nominatim:

@@ -59,7 +59,7 @@ PUBSUB_CHANNEL_TRACKS = "tracks:updates"
 CACHE_PREFIX = "llm:cache:"
 CACHE_TTL_SEC = 24 * 3600
 
-TTL_MIN = 15
+TTL_MIN = int(os.environ.get("DRONE_EVENT_TTL_MIN", "35"))
 
 # Phase 3 dedup window — per TZ section 3.1, two reports of the same event_type
 # within these bounds are the same physical drone, merged into one cluster.
