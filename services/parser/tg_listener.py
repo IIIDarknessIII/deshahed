@@ -34,6 +34,16 @@ SESSION_PATH = SESSION_DIR / "main"
 REDIS_URL_ENV = "REDIS_URL"
 STREAM_RAW = "messages_raw"
 
+# Polling fallback: Telethon's realtime update loop can silently stall after a
+# long reconnect storm (connection stays alive and answers getDifference, but
+# NewMessage events stop arriving). To stay robust we ALSO poll each channel on
+# an interval and push any message we haven't seen yet. Dedup against realtime
+# is by a Redis SET of "channel:message_id" so a message is never double-pushed.
+POLL_INTERVAL_SEC = int(os.environ.get("TG_POLL_INTERVAL_SEC", "60"))
+POLL_LOOKBACK = int(os.environ.get("TG_POLL_LOOKBACK", "15"))
+SEEN_SET = "tg:seen_ids"
+SEEN_MAX = 5000  # trim the dedup set so it can't grow unbounded
+
 
 def _parse_channels(raw: str) -> list[str]:
     return [c.strip() for c in raw.split(",") if c.strip()]
@@ -72,26 +82,33 @@ async def _run(stop: asyncio.Event) -> None:
     client = TelegramClient(str(SESSION_PATH), api_id, api_hash)
     log.info("connecting telethon, requested channels=%s", channels)
 
+    async def publish(username: str, message, *, via: str) -> None:
+        """Push one message to the stream unless we've already seen its id.
+        `via` is just for the log line (realtime vs poll)."""
+        text = message.text or ""
+        if not text:
+            return
+        seen_key = f"{username}:{message.id}"
+        # SADD returns 1 if newly added, 0 if it was already present.
+        added = await redis.sadd(SEEN_SET, seen_key)
+        if not added:
+            return
+        payload = {
+            "channel": username,
+            "message_id": message.id,
+            "text": text,
+            "date": message.date.isoformat(),
+        }
+        try:
+            await redis.xadd(STREAM_RAW, {"data": json.dumps(payload, ensure_ascii=False)})
+            log.info("msg(%s) from @%s id=%s len=%d → %s", via, username, message.id, len(text), STREAM_RAW)
+        except Exception:
+            log.exception("failed to xadd; message dropped: @%s id=%s", username, message.id)
+
     async def handler(event):
         chat = await event.get_chat()
         username = getattr(chat, "username", None) or str(getattr(chat, "id", ""))
-        text = event.message.text or ""
-        payload = {
-            "channel": username,
-            "message_id": event.id,
-            "text": text,
-            "date": event.message.date.isoformat(),
-        }
-        try:
-            await redis.xadd(
-                STREAM_RAW, {"data": json.dumps(payload, ensure_ascii=False)}
-            )
-            log.info(
-                "msg from @%s id=%s len=%d → %s",
-                username, event.id, len(text), STREAM_RAW,
-            )
-        except Exception:
-            log.exception("failed to xadd; message dropped: @%s id=%s", username, event.id)
+        await publish(username, event.message, via="rt")
 
     await client.start()
     log.info("connected as %s", await client.get_me())
@@ -99,11 +116,11 @@ async def _run(stop: asyncio.Event) -> None:
     # Resolve each requested channel — skip the ones that don't exist /
     # aren't accessible by this account, so a single typo in TG_CHANNELS
     # doesn't take down the whole listener.
-    valid: list[str] = []
+    valid: list = []  # (username, entity)
     for ch in channels:
         try:
             entity = await client.get_entity(ch)
-            valid.append(ch)
+            valid.append((ch, entity))
             log.info("subscribed: @%s (id=%s)", ch, getattr(entity, "id", "?"))
         except Exception as e:
             log.warning("skipping channel @%s: %s", ch, str(e)[:200])
@@ -112,15 +129,51 @@ async def _run(stop: asyncio.Event) -> None:
         log.error("no resolvable channels in TG_CHANNELS=%s — exiting", channels)
         raise SystemExit(2)
 
-    client.add_event_handler(handler, events.NewMessage(chats=valid))
+    client.add_event_handler(handler, events.NewMessage(chats=[e for _, e in valid]))
+
+    async def poll_loop() -> None:
+        """Safety net against a stalled realtime update loop. Periodically pulls
+        the latest messages from each channel; `publish` dedups so anything the
+        realtime handler already delivered is skipped."""
+        # Prime the dedup set with current latest ids WITHOUT publishing, so we
+        # don't replay history on startup — only genuinely new messages flow.
+        for username, entity in valid:
+            try:
+                async for m in client.iter_messages(entity, limit=POLL_LOOKBACK):
+                    await redis.sadd(SEEN_SET, f"{username}:{m.id}")
+            except Exception as e:
+                log.warning("poll prime failed for @%s: %s", username, str(e)[:120])
+        while not stop.is_set():
+            try:
+                await asyncio.wait_for(stop.wait(), timeout=POLL_INTERVAL_SEC)
+                break  # stop was set
+            except asyncio.TimeoutError:
+                pass
+            for username, entity in valid:
+                try:
+                    async for m in client.iter_messages(entity, limit=POLL_LOOKBACK):
+                        await publish(username, m, via="poll")
+                except Exception as e:
+                    log.warning("poll failed for @%s: %s", username, str(e)[:120])
+            # Keep the dedup set bounded.
+            try:
+                if await redis.scard(SEEN_SET) > SEEN_MAX:
+                    await redis.delete(SEEN_SET)
+                    for username, entity in valid:
+                        async for m in client.iter_messages(entity, limit=POLL_LOOKBACK):
+                            await redis.sadd(SEEN_SET, f"{username}:{m.id}")
+            except Exception:
+                pass
 
     stop_task = asyncio.create_task(stop.wait())
     disconnect_task = asyncio.create_task(client.run_until_disconnected())
+    poll_task = asyncio.create_task(poll_loop())
     try:
-        done, _ = await asyncio.wait(
+        await asyncio.wait(
             {stop_task, disconnect_task}, return_when=asyncio.FIRST_COMPLETED
         )
     finally:
+        poll_task.cancel()
         await client.disconnect()
         await redis.aclose()
 
