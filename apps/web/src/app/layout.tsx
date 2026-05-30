@@ -6,7 +6,8 @@ import { ServiceWorkerInit } from "@/components/ServiceWorkerInit";
 const GA_ID = "G-B1N64BFB0R";
 // Google Search Console verification token — set GOOGLE_SITE_VERIFICATION in
 // the environment (or hardcode here). Omitted from <head> until provided.
-const GSC_VERIFICATION = process.env.GOOGLE_SITE_VERIFICATION || "";
+const GSC_VERIFICATION =
+  process.env.GOOGLE_SITE_VERIFICATION || "jLHKpYKwccCo2s2uYuOITfSxuE12Pza03vuTXQcRCdw";
 
 export const viewport: Viewport = {
   themeColor: "#0a0a0b",
