@@ -34,9 +34,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       siteName: "deshahed",
       locale: "uk_UA",
       type: "website",
-      images: [{ url: "/og.png", width: 1200, height: 630, alt: title }],
+      // og:image comes from the colocated opengraph-image.tsx (dynamic card).
     },
-    twitter: { card: "summary_large_image", title, description, images: ["/og.png"] },
+    twitter: { card: "summary_large_image", title, description },
   };
 }
 
