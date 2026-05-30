@@ -1,10 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import Script from "next/script";
 import "./globals.css";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { ServiceWorkerInit } from "@/components/ServiceWorkerInit";
 
 const GA_ID = "G-B1N64BFB0R";
+// Google Search Console verification token — set GOOGLE_SITE_VERIFICATION in
+// the environment (or hardcode here). Omitted from <head> until provided.
+const GSC_VERIFICATION = process.env.GOOGLE_SITE_VERIFICATION || "";
 
 export const viewport: Viewport = {
   themeColor: "#0a0a0b",
@@ -24,6 +26,7 @@ export const metadata: Metadata = {
   description:
     "Карта повітряних тривог та повідомлень про БпЛА в Україні з відкритих джерел. Дані з alerts.in.ua та OSINT-моніторингу.",
   applicationName: "deshahed",
+  ...(GSC_VERIFICATION ? { verification: { google: GSC_VERIFICATION } } : {}),
   keywords: [
     "повітряна тривога",
     "Україна",
@@ -82,17 +85,17 @@ export default function RootLayout({
   return (
     <html lang="uk">
       <head>
-        {/* Google tag (gtag.js) */}
-        <Script
-          src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
-          strategy="afterInteractive"
-        />
-        <Script id="gtag-init" strategy="afterInteractive">
-          {`window.dataLayer = window.dataLayer || [];
+        {/* Google tag (gtag.js) — raw tags so they render in <head>. */}
+        <script async src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`} />
+        <script
+          // eslint-disable-next-line react/no-danger
+          dangerouslySetInnerHTML={{
+            __html: `window.dataLayer = window.dataLayer || [];
 function gtag(){dataLayer.push(arguments);}
 gtag('js', new Date());
-gtag('config', '${GA_ID}');`}
-        </Script>
+gtag('config', '${GA_ID}');`,
+          }}
+        />
       </head>
       <body>
         <QueryProvider>{children}</QueryProvider>
