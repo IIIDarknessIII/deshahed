@@ -10,6 +10,7 @@ import { HistoryModal } from "@/components/HistoryModal";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { AviationBanner } from "@/components/AviationBanner";
 import { SupportButton } from "@/components/SupportButton";
+import { DownloadAppButton } from "@/components/DownloadAppButton";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { useUiStore } from "@/stores/uiStore";
 
@@ -30,6 +31,7 @@ export function AppShell() {
         <Map />
         <AviationBanner />
         <SupportButton />
+        <DownloadAppButton />
       </div>
       <StatsPanel />
 
