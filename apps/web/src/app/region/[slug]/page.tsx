@@ -5,12 +5,15 @@ import type { Metadata } from "next";
 import { REGIONS, REGION_BY_SLUG } from "@/lib/regions";
 import { SUBREGIONS } from "@/lib/subregions_index";
 import { RegionHistory } from "@/components/region/RegionHistory";
+import { oblastStatus, statusSentence, STATE_LABEL } from "@/lib/serverStatus";
 
 interface Props {
   params: Promise<{ slug: string }>;
 }
 
 const SITE = "https://xn----8sbkccc5iwa.online";
+
+export const revalidate = 600;
 
 export async function generateStaticParams() {
   return REGIONS.map((r) => ({ slug: r.slug }));
@@ -20,9 +23,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const r = REGION_BY_SLUG[slug];
   if (!r) return { title: "Регіон не знайдено" };
-  // The root metadata template already appends " · deshahed".
-  const title = `${r.title} — карта повітряних тривог`;
-  const description = `Реальний час повітряних тривог та БпЛА на ${r.full_name_uk}. OSINT-моніторинг.`;
+  const status = await oblastStatus(r.full_name_uk);
+  const verdict = status.state === "safe" ? "тривоги немає" : STATE_LABEL[status.state];
+  // Lead the title/description with the live verdict for the SERP snippet.
+  const title = `${r.full_name_uk} — ${verdict} (зараз)`;
+  const description = `${statusSentence(status)} на ${r.full_name_uk}. Карта повітряних тривог та БпЛА в реальному часі по районах і громадах. OSINT-моніторинг.`;
   return {
     title,
     description,
@@ -49,6 +54,40 @@ export default async function RegionPage({ params }: Props) {
   const raions = children.filter((s) => s.type === "raion");
   const hromadas = children.filter((s) => s.type === "hromada");
 
+  const status = await oblastStatus(region.full_name_uk);
+  const ssrSentence = statusSentence(status);
+  const statusCls =
+    status.state === "safe"
+      ? "border-emerald-600/50 bg-emerald-600/10 text-emerald-300"
+      : status.state === "artillery_shelling"
+        ? "border-orange-500/50 bg-orange-500/10 text-orange-300"
+        : status.state === "urban_fights"
+          ? "border-purple-500/50 bg-purple-500/10 text-purple-300"
+          : "border-red-500/50 bg-red-500/10 text-red-300";
+
+  const faq = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: [
+      {
+        "@type": "Question",
+        name: `Чи є зараз повітряна тривога на ${region.full_name_uk}?`,
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: `${ssrSentence} на ${region.full_name_uk}. Стан тривоги оновлюється в реальному часі з alerts.in.ua та OSINT-моніторингу; деталі по районах і громадах — нижче на сторінці та на інтерактивній карті deshahed.`,
+        },
+      },
+      {
+        "@type": "Question",
+        name: `Скільки районів і громад у ${region.full_name_uk}?`,
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: `На ${region.full_name_uk} ми відстежуємо ${raions.length} район(ів) та ${hromadas.length} громад(и) — кожен має власну сторінку зі станом тривоги.`,
+        },
+      },
+    ],
+  };
+
   return (
     <main className="min-h-dvh bg-bg">
       <header className="sticky top-0 z-10 border-b border-border bg-bg/95 pt-[var(--safe-top)] backdrop-blur">
@@ -69,12 +108,21 @@ export default async function RegionPage({ params }: Props) {
 
       <div className="mx-auto max-w-4xl space-y-6 px-4 py-6 pb-[max(1.5rem,var(--safe-bottom))]">
         <section className="rounded-md border border-border p-4">
-          <h1 className="mb-2 text-xl font-semibold text-zinc-100">
-            {region.full_name_uk} — повітряні тривоги
+          <h1 className="mb-3 text-xl font-semibold text-zinc-100">
+            Повітряна тривога — {region.full_name_uk}
           </h1>
-          <p className="text-sm text-zinc-400">
-            Реальний час подій з відкритих джерел. Дивіться поточну ситуацію
-            на <Link className="underline" href="/">інтерактивній карті</Link>.
+          <div className={`mb-3 flex items-center gap-2 rounded-md border px-4 py-3 text-sm font-medium ${statusCls}`}>
+            <span className="inline-flex h-2.5 w-2.5 animate-pulse rounded-full bg-current" />
+            {ssrSentence}
+          </div>
+          <p className="text-sm leading-relaxed text-zinc-400">
+            <strong className="text-zinc-200">{ssrSentence}</strong> на{" "}
+            {region.full_name_uk}. Ця сторінка показує стан повітряної тривоги та
+            загроз (БпЛА, ракети, артобстріл) у реальному часі за даними
+            alerts.in.ua та OSINT-моніторингу. Нижче — історія тривог за останні
+            періоди та перелік {raions.length} районів і {hromadas.length} громад
+            області, кожен зі своєю сторінкою. Загальну картину по всій країні
+            дивіться на <Link className="underline hover:text-zinc-200" href="/">інтерактивній карті</Link>.
           </p>
         </section>
 
@@ -147,6 +195,11 @@ export default async function RegionPage({ params }: Props) {
             ],
           }),
         }}
+      />
+      <script
+        type="application/ld+json"
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faq) }}
       />
     </main>
   );

@@ -25,5 +25,5 @@ export default async function Page({ params }: Props) {
   const { slug } = await params;
   const sub = HROMADA_BY_SLUG[slug];
   if (!sub) notFound();
-  return <SubRegionPage sub={sub} />;
+  return await SubRegionPage({ sub });
 }

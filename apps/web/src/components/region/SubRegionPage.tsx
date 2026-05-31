@@ -4,6 +4,7 @@ import { ArrowLeft, Map as MapIcon } from "lucide-react";
 import type { SubRegion } from "@/lib/subregions_index";
 import { SubRegionStatus } from "@/components/region/SubRegionStatus";
 import { RegionHistory } from "@/components/region/RegionHistory";
+import { subRegionStatus, statusSentence, STATE_LABEL } from "@/lib/serverStatus";
 
 const SITE = "https://xn----8sbkccc5iwa.online";
 
@@ -15,12 +16,15 @@ function kind(type: SubRegion["type"]): string {
   return type === "raion" ? "району" : "громади";
 }
 
-export function subRegionMetadata(sub: SubRegion): Metadata {
+export async function subRegionMetadata(sub: SubRegion): Promise<Metadata> {
   const url = `${SITE}${basePath(sub.type)}/${sub.slug}`;
-  const title = `${sub.name_uk} — повітряна тривога зараз`;
-  const description = `Поточний стан повітряної тривоги та загроз для ${kind(
-    sub.type,
-  )} «${sub.name_uk}»${sub.oblast ? `, ${sub.oblast}` : ""}. Реальний час, дані з відкритих джерел (OSINT).`;
+  const status = await subRegionStatus(sub.mkey);
+  // Lead the title with the live verdict so the SERP snippet answers the query.
+  const verdict = status.state === "safe" ? "тривоги немає" : STATE_LABEL[status.state];
+  const title = `${sub.name_uk} — ${verdict} (зараз)`;
+  const description = `${statusSentence(status)} — ${kind(sub.type)} «${sub.name_uk}»${
+    sub.oblast ? `, ${sub.oblast}` : ""
+  }. Стан повітряної тривоги в реальному часі, дані з відкритих джерел (OSINT).`;
   return {
     title,
     description,
@@ -38,8 +42,10 @@ export function subRegionMetadata(sub: SubRegion): Metadata {
   };
 }
 
-export function SubRegionPage({ sub }: { sub: SubRegion }) {
+export async function SubRegionPage({ sub }: { sub: SubRegion }) {
   const url = `${SITE}${basePath(sub.type)}/${sub.slug}`;
+  const status = await subRegionStatus(sub.mkey);
+  const ssrSentence = statusSentence(status);
 
   const breadcrumb = {
     "@context": "https://schema.org",
@@ -62,7 +68,7 @@ export function SubRegionPage({ sub }: { sub: SubRegion }) {
         name: `Чи є зараз повітряна тривога в «${sub.name_uk}»?`,
         acceptedAnswer: {
           "@type": "Answer",
-          text: `Актуальний стан тривоги для ${kind(
+          text: `${ssrSentence}. Актуальний стан тривоги для ${kind(
             sub.type,
           )} «${sub.name_uk}» оновлюється в реальному часі на цій сторінці та на інтерактивній карті deshahed. Джерело — alerts.in.ua та OSINT-моніторинг.`,
         },
@@ -97,9 +103,12 @@ export function SubRegionPage({ sub }: { sub: SubRegion }) {
           <h1 className="text-xl font-semibold text-zinc-100">
             Повітряна тривога — {sub.name_uk}
           </h1>
-          <SubRegionStatus mkey={sub.mkey} />
+          <SubRegionStatus
+            mkey={sub.mkey}
+            initial={{ state: status.state, since: status.since }}
+          />
           <p className="text-sm leading-relaxed text-zinc-400">
-            Поточна ситуація з повітряними тривогами та загрозами для{" "}
+            <strong className="text-zinc-200">{ssrSentence}.</strong> Поточна ситуація з повітряними тривогами та загрозами для{" "}
             {kind(sub.type)} «{sub.name_uk}»
             {sub.oblast && (
               <>

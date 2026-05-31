@@ -18,15 +18,28 @@ const META: Record<Exclude<OblastAlertState, "safe">, { label: string; cls: stri
   },
 };
 
+export interface InitialStatus {
+  state: Exclude<OblastAlertState, "safe"> | "safe";
+  since: string | null;
+}
+
 /**
- * Live alert status for one sub-region. Opens the same WebSocket the map uses
- * and reads the region's own state by its normalized match key.
+ * Live alert status for one sub-region. Renders the server-provided `initial`
+ * status first (so the real state is in the SSR HTML for crawlers), then the
+ * WebSocket takes over for realtime updates once connected.
  */
-export function SubRegionStatus({ mkey }: { mkey: string }) {
+export function SubRegionStatus({ mkey, initial }: { mkey: string; initial?: InitialStatus }) {
+  const connected = useAlertsStore((s) => s.connected);
   useAlertsSocket();
-  const sr = useAlertsStore(
+  const live = useAlertsStore(
     useShallow((s) => selectSubRegionStates(s).get(mkey) ?? null),
   );
+  // Before the socket connects, trust the SSR value; after, the store wins.
+  const sr =
+    live ??
+    (!connected && initial && initial.state !== "safe"
+      ? { state: initial.state, started_at: initial.since ?? new Date().toISOString() }
+      : null);
 
   if (!sr) {
     return (
