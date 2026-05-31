@@ -514,6 +514,10 @@ export function Map() {
             8, 0.9,
           ],
           "icon-allow-overlap": true,
+          // Don't reserve space in the collision index — otherwise a drone icon
+          // sitting over an oblast label hides the label (which has
+          // text-allow-overlap:false). Drones float above; labels stay.
+          "icon-ignore-placement": true,
           "icon-rotation-alignment": "map",
           // Point the silhouette toward its projected direction when known.
           "icon-rotate": ["coalesce", ["get", "bearing"], 0],
@@ -529,6 +533,7 @@ export function Map() {
           "icon-image": "dir-arrow",
           "icon-size": ["interpolate", ["linear"], ["zoom"], 4, 0.7, 8, 0.5],
           "icon-allow-overlap": true,
+          "icon-ignore-placement": true,
           "icon-rotation-alignment": "map",
           "icon-rotate": ["coalesce", ["get", "bearing"], 0],
         },
@@ -587,6 +592,7 @@ export function Map() {
               8, 0.9,
             ],
             "icon-allow-overlap": true,
+            "icon-ignore-placement": true,
             "icon-rotation-alignment": "map",
             "icon-rotate": ["coalesce", ["get", "bearing"], 0],
           },
