@@ -1,13 +1,33 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Download } from "lucide-react";
+
+function isStandalone(): boolean {
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    // iOS Safari home-screen apps
+    (window.navigator as { standalone?: boolean }).standalone === true ||
+    // TWA launches with this referrer
+    document.referrer.startsWith("android-app://")
+  );
+}
 
 /**
  * Floating "download Android app" pill, pinned to the map's bottom-right —
  * mirrors SupportButton (bottom-left) so the two sit opposite each other.
- * Serves the signed APK from /deshahed.apk.
+ * Hidden when already running inside the installed app (TWA/standalone PWA):
+ * a user who's in the app obviously doesn't need to download it.
  */
 export function DownloadAppButton() {
+  const [show, setShow] = useState(false);
+
+  useEffect(() => {
+    setShow(!isStandalone());
+  }, []);
+
+  if (!show) return null;
+
   return (
     <a
       href="/deshahed.apk"
