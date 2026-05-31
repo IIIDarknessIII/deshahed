@@ -12,6 +12,7 @@ import { useTracksStore } from "@/stores/tracksStore";
 import { useUiStore } from "@/stores/uiStore";
 import { UID_BY_TITLE } from "@/lib/locations";
 import type { DroneEvent, DroneTrack } from "@/lib/types";
+import { objectInfo, typicalSpeed, typicalAltitude, compass } from "@/lib/objectInfo";
 import { HeatmapController } from "@/components/HeatmapLayer";
 
 const SOURCE_ID = "oblasts";
@@ -769,6 +770,52 @@ export function Map() {
         const uid = UID_BY_TITLE[title];
         if (uid !== undefined) useUiStore.getState().selectLocation(uid);
       });
+
+      // ---- Drone objects: hover summary popup + click → detail modal ----
+      const dronePopup = new maplibregl.Popup({
+        closeButton: false,
+        closeOnClick: false,
+        className: "deshahed-popup",
+        offset: 14,
+      });
+      const droneOnMove = (e: maplibregl.MapLayerMouseEvent) => {
+        if (cancelled || !e.features || !e.features.length) return;
+        map.getCanvas().style.cursor = "pointer";
+        const p = (e.features[0].properties ?? {}) as {
+          event_type?: string;
+          bearing?: number;
+          confidence?: string;
+        };
+        const info = objectInfo(p.event_type ?? "unknown");
+        const hasDir = typeof p.bearing === "number" && p.bearing !== 0;
+        const c = hasDir ? compass(p.bearing as number) : null;
+        const courseLine = c
+          ? `<div class="text-[11px] text-zinc-300">Курс: <span class="text-zinc-100">${Math.round(p.bearing as number)}° ${c.abbr}</span></div>`
+          : `<div class="text-[11px] text-zinc-500">Курс: невідомо</div>`;
+        const html = `
+          <div class="px-2 py-1.5 max-w-[230px]">
+            <div class="text-[12px] font-semibold" style="color:${info.accent}">${escapeHtml(info.label)}</div>
+            ${courseLine}
+            <div class="text-[11px] text-zinc-400">Швидкість: ${escapeHtml(typicalSpeed(info))} <span class="text-zinc-600">(типова)</span></div>
+            <div class="text-[11px] text-zinc-400">Висота: ${escapeHtml(typicalAltitude(info))} <span class="text-zinc-600">(типова)</span></div>
+            <div class="mt-1 text-[10px] text-zinc-500">Натисніть для деталей</div>
+          </div>`;
+        dronePopup.setLngLat(e.lngLat).setHTML(html).addTo(map);
+      };
+      const droneOnLeave = () => {
+        map.getCanvas().style.cursor = "";
+        dronePopup.remove();
+      };
+      const droneOnClick = (e: maplibregl.MapLayerMouseEvent) => {
+        if (cancelled || !e.features || !e.features.length) return;
+        const id = (e.features[0].properties as { id?: number } | null)?.id;
+        if (typeof id === "number") useUiStore.getState().selectDrone(id);
+      };
+      for (const layer of [DRONES_POINT_LAYER, TRAJECTORIES_HEAD_LAYER]) {
+        map.on("mousemove", layer, droneOnMove);
+        map.on("mouseleave", layer, droneOnLeave);
+        map.on("click", layer, droneOnClick);
+      }
 
       // Raion / hromada hover popup — region name + its own alert state and
       // duration (looked up by the normalized match key on the feature).

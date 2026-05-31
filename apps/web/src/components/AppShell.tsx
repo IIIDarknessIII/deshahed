@@ -7,6 +7,7 @@ import { Map } from "@/components/Map";
 import { AlertsPanel } from "@/components/AlertsPanel";
 import { StatsPanel } from "@/components/StatsPanel";
 import { HistoryModal } from "@/components/HistoryModal";
+import { DroneDetailModal } from "@/components/DroneDetailModal";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { AviationBanner } from "@/components/AviationBanner";
 import { SupportButton } from "@/components/SupportButton";
@@ -48,6 +49,7 @@ export function AppShell() {
       <InstallPrompt />
       <MobileBottomNav />
       <HistoryModal />
+      <DroneDetailModal />
     </main>
   );
 }
