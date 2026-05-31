@@ -1,0 +1,10 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "online.deshahed.twa",
+      "sha256_cert_fingerprints": ["0D:0C:32:1F:BC:5E:6D:0F:06:4C:76:47:3A:A8:16:DC:E4:E8:9F:BB:4C:2F:25:3E:9F:18:53:F6:8F:AB:93:97"]
+    }
+  }
+]

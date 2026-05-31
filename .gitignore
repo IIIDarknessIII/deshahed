@@ -34,3 +34,12 @@ docker_volumes/
 *.session-journal
 
 .claude/
+
+# Android TWA build (Bubblewrap)
+android/android.keystore
+android/KEYSTORE_CREDENTIALS.txt
+android/.gradle/
+android/app/build/
+android/build/
+*.apk
+*.aab
