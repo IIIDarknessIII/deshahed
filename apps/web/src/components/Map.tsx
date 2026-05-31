@@ -765,6 +765,13 @@ export function Map() {
 
       map.on("click", FILL_LAYER, (e) => {
         if (cancelled || !e.features || e.features.length === 0) return;
+        // A drone icon sits on top of the oblast fill — if the click landed on
+        // one, it owns the click (opens the object modal); don't also open the
+        // region history underneath.
+        const onDrone = map.queryRenderedFeatures(e.point, {
+          layers: [DRONES_POINT_LAYER, TRAJECTORIES_HEAD_LAYER],
+        });
+        if (onDrone.length > 0) return;
         const f = e.features[0];
         const title = (f.properties as { full_name_uk?: string } | null)?.full_name_uk ?? "";
         const uid = UID_BY_TITLE[title];
