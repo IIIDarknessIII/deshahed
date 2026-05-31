@@ -43,3 +43,5 @@ android/app/build/
 android/build/
 *.apk
 *.aab
+# but DO ship the downloadable app APK
+!apps/web/public/deshahed.apk

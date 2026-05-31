@@ -108,6 +108,25 @@ export default function AboutPage() {
           </p>
         </Section>
 
+        <Section title="Застосунок для Android">
+          <p>
+            Доступний застосунок для Android — це та сама карта у вигляді
+            окремого додатку на весь екран, зі сповіщеннями про тривоги.
+          </p>
+          <a
+            href="/deshahed.apk"
+            download
+            className="inline-flex items-center gap-2 rounded-md border border-emerald-600/60 bg-emerald-600/10 px-4 py-2.5 text-sm font-medium text-emerald-200 transition hover:bg-emerald-600/20"
+          >
+            ⬇ Завантажити APK для Android
+          </a>
+          <p className="text-[12px] text-zinc-500">
+            Після завантаження відкрийте файл і дозвольте встановлення з цього
+            джерела. На iPhone застосунку немає — відкрийте сайт у Safari та
+            додайте на головний екран.
+          </p>
+        </Section>
+
         <Section title="Важливо — це не офіційне джерело">
           <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-amber-100">
             Дані зібрані з відкритих джерел (OSINT) і можуть містити затримки, помилки або

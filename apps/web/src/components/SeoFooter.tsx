@@ -34,6 +34,7 @@ export function SeoFooter() {
           <Link href="/timelapse" className="hover:text-zinc-100 hover:underline">Тайм-лапс за добу</Link>
           <Link href="/embed" className="hover:text-zinc-100 hover:underline">Віджет для сайту</Link>
           <Link href="/about" className="hover:text-zinc-100 hover:underline">Про проєкт</Link>
+          <a href="/deshahed.apk" download className="text-emerald-300 hover:text-emerald-200 hover:underline">Android-застосунок</a>
         </nav>
 
         <p className="border-t border-border/60 pt-4 text-[12px] leading-relaxed text-zinc-500">
