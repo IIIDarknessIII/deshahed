@@ -4,10 +4,18 @@ import { QueryProvider } from "@/providers/QueryProvider";
 import { ServiceWorkerInit } from "@/components/ServiceWorkerInit";
 
 const GA_ID = "G-B1N64BFB0R";
-// Google Search Console verification token — set GOOGLE_SITE_VERIFICATION in
-// the environment (or hardcode here). Omitted from <head> until provided.
+// Search-engine verification tokens. Google is set; Bing/Yandex are wired to
+// env and emit their <meta> only once a token is provided (paste the value
+// each console gives you into the corresponding env var, no code change).
 const GSC_VERIFICATION =
   process.env.GOOGLE_SITE_VERIFICATION || "jLHKpYKwccCo2s2uYuOITfSxuE12Pza03vuTXQcRCdw";
+const YANDEX_VERIFICATION = process.env.YANDEX_VERIFICATION || "";
+const BING_VERIFICATION = process.env.BING_VERIFICATION || ""; // msvalidate.01
+
+const verification: NonNullable<Metadata["verification"]> = {};
+if (GSC_VERIFICATION) verification.google = GSC_VERIFICATION;
+if (YANDEX_VERIFICATION) verification.yandex = YANDEX_VERIFICATION;
+if (BING_VERIFICATION) verification.other = { "msvalidate.01": BING_VERIFICATION };
 
 export const viewport: Viewport = {
   themeColor: "#0a0a0b",
@@ -27,7 +35,7 @@ export const metadata: Metadata = {
   description:
     "Карта повітряних тривог та повідомлень про БпЛА в Україні з відкритих джерел. Дані з alerts.in.ua та OSINT-моніторингу.",
   applicationName: "deshahed",
-  ...(GSC_VERIFICATION ? { verification: { google: GSC_VERIFICATION } } : {}),
+  ...(Object.keys(verification).length ? { verification } : {}),
   keywords: [
     "повітряна тривога",
     "Україна",
