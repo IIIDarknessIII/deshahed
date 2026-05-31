@@ -40,6 +40,14 @@ const ICONS: { node: React.ReactNode; label: string }[] = [
     ),
   },
   {
+    label: "Розвідувальний БпЛА",
+    node: (
+      <Glyph>
+        <path d="M16 3 L28 25 L16 20 L4 25 Z" fill="#2dd4bf" stroke="#0a0a0b" strokeWidth={1.5} strokeLinejoin="round" />
+      </Glyph>
+    ),
+  },
+  {
     label: "КАБ",
     node: (
       <Glyph>

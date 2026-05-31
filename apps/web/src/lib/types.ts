@@ -59,6 +59,7 @@ export type WsMessage =
 
 export type DroneEventType =
   | "shahed"
+  | "recon"
   | "missile"
   | "kab"
   | "aviation"

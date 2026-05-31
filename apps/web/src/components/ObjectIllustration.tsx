@@ -29,6 +29,22 @@ export function ObjectIllustration({ type }: { type: DroneEventType | string }) 
           </g>
         </svg>
       );
+    case "recon":
+      return (
+        <svg {...common} aria-hidden>
+          <rect width="120" height="80" fill="#1c1917" />
+          <g transform="translate(60,40)">
+            {/* fixed-wing recon drone with a gimbal camera "eye" */}
+            <path d="M-40 0 L34 0 L26 -3 L-40 -3 Z" fill="#2dd4bf" stroke="#0a0a0b" strokeWidth="1.2" />
+            <path d="M-6 -2 L-2 -30 L6 -2 Z" fill="#14b8a6" stroke="#0a0a0b" strokeWidth="1.2" />
+            <path d="M-6 2 L-2 30 L6 2 Z" fill="#14b8a6" stroke="#0a0a0b" strokeWidth="1.2" />
+            <path d="M-40 0 L-50 -6 L-50 6 Z" fill="#0d9488" stroke="#0a0a0b" strokeWidth="1" />
+            <rect x="28" y="-4" width="12" height="8" rx="3" fill="#2dd4bf" stroke="#0a0a0b" strokeWidth="1.2" />
+            <circle cx="20" cy="6" r="5" fill="#0f172a" stroke="#5eead4" strokeWidth="1.5" />
+            <circle cx="20" cy="6" r="1.6" fill="#5eead4" />
+          </g>
+        </svg>
+      );
     case "aviation":
       return (
         <svg {...common} aria-hidden>

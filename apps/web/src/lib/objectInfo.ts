@@ -26,6 +26,15 @@ export const OBJECT_INFO: Record<DroneEventType, ObjectTypeInfo> = {
     typicalAltitudeKm: [1, 4],
     accent: "#fb923c",
   },
+  recon: {
+    label: "Розвідувальний БпЛА",
+    fullName: "Розвідувальний дрон (Орлан, ZALA, Supercam тощо)",
+    description:
+      "Безпілотник для розвідки та коригування вогню — без бойової частини. Кружляє над територією, передає координати цілей. Поява часто передує артобстрілу або удару, тож слідкуйте за ситуацією.",
+    typicalSpeedKmh: [90, 150],
+    typicalAltitudeKm: [1, 5],
+    accent: "#2dd4bf",
+  },
   missile: {
     label: "Ракета",
     fullName: "Крилата / балістична ракета",

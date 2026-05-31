@@ -30,6 +30,7 @@ log = logging.getLogger("local_extractor")
 # on pymorphy3 knowing the loanword. Stems are chosen to be unambiguous.
 TYPE_STEMS: dict[DroneEventType, set[str]] = {
     "shahed": {"шахед", "shahed", "герань", "geran"},
+    "recon": {"розвід", "развед"},  # розвідувальний / розвідувальник
     "missile": {
         "ракет", "крилат", "балістик", "калібр", "kalibr",
         "кинджал", "іскандер", "онікс",
@@ -41,6 +42,7 @@ TYPE_STEMS: dict[DroneEventType, set[str]] = {
 # Exact-lemma matches for shorter ambiguous tokens — applied after stems.
 TYPE_LEMMAS: dict[DroneEventType, set[str]] = {
     "shahed": {"дрон", "безпілотник", "бпла"},
+    "recon": set(),
     "missile": set(),
     "kab": {"керований"},
     "aviation": set(),
@@ -51,6 +53,7 @@ TYPE_RAW_PATTERNS: dict[DroneEventType, list[re.Pattern[str]]] = {
     "kab": [re.compile(r"\bкаб[- ]?\d*\b", re.IGNORECASE), re.compile(r"\bкаби\b", re.IGNORECASE)],
     "aviation": [re.compile(r"\b(су|ту|міг)[- ]?\d{2,3}\b", re.IGNORECASE)],
     "shahed": [re.compile(r"\bshahed[- ]?\d*\b", re.IGNORECASE)],
+    "recon": [re.compile(r"\b(орлан|зала|zala|суперкам|supercam|мерлин|merlin|развед|розвід)\w*\b", re.IGNORECASE)],
 }
 
 COUNT_WORDS: dict[str, int] = {

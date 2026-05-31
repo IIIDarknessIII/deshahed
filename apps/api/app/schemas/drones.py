@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-DroneEventType = Literal["shahed", "missile", "kab", "aviation", "unknown"]
+DroneEventType = Literal["shahed", "recon", "missile", "kab", "aviation", "unknown"]
 ConfidenceLevel = Literal["high", "medium", "low"]
 
 
