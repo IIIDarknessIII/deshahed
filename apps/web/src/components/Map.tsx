@@ -9,7 +9,7 @@ import {
 } from "@/stores/alertsStore";
 import { useDronesStore } from "@/stores/dronesStore";
 import { useTracksStore } from "@/stores/tracksStore";
-import { useUiStore } from "@/stores/uiStore";
+import { useUiStore, type BaseMap } from "@/stores/uiStore";
 import { UID_BY_TITLE } from "@/lib/locations";
 import type { DroneEvent, DroneTrack } from "@/lib/types";
 import { objectInfo, typicalSpeed, typicalAltitude, compass } from "@/lib/objectInfo";
@@ -41,6 +41,37 @@ const TRAJECTORIES_HEAD_LAYER = "trajectories-head";
 
 const HEATMAP_SOURCE = "heatmap";
 const HEATMAP_FILL_LAYER = "heatmap-fill";
+
+// Optional "political" basemap — a real dark reference map (borders, cities,
+// roads, place names) rendered *under* the threat overlays. Tiles: CARTO Dark
+// Matter (free, OpenStreetMap-based). Toggled via uiStore.baseMap.
+const POLITICAL_SOURCE = "political-base";
+const POLITICAL_LAYER = "political-base";
+const POLITICAL_TILES = [
+  "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+  "https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+  "https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+  "https://d.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+];
+
+// Show/hide the political basemap. When it's on, "safe" oblasts become
+// transparent so the real map shows through (only active alerts stay tinted).
+function applyBaseMapStyle(map: MapLibreMap, baseMap: BaseMap): void {
+  const political = baseMap === "political";
+  if (map.getLayer(POLITICAL_LAYER)) {
+    map.setLayoutProperty(POLITICAL_LAYER, "visibility", political ? "visible" : "none");
+  }
+  if (map.getLayer(FILL_LAYER)) {
+    map.setPaintProperty(FILL_LAYER, "fill-opacity", [
+      "match",
+      ["get", "state"],
+      "urban_fights", political ? 0.6 : 0.55,
+      "artillery_shelling", political ? 0.55 : 0.5,
+      "air_raid", political ? 0.5 : 0.45,
+      political ? 0 : 0.55,
+    ]);
+  }
+}
 
 const RAIONS_SOURCE = "raions";
 const RAIONS_FILL = "raions-fill";
@@ -149,13 +180,19 @@ function artillerySvg(): string {
 }
 
 const DRONE_ICONS: Record<string, string> = {
-  "drone-shahed": droneSvg("#fb923c"),
-  "drone-recon": droneSvg("#2dd4bf"),
   "drone-missile": missileSvg("#dc2626"),
   "drone-kab": droneSvg("#a855f7"),
   "drone-aviation": droneSvg("#38bdf8"),
   "dir-arrow": arrowSvg("#fca5a5"),
   "threat-artillery": artillerySvg(),
+};
+
+// Real raster icons (red silhouettes, served from /public/icons) for the
+// primary UAV types — these replace the generic delta-wing/dot SVGs above.
+const DRONE_PNG_ICONS: Record<string, string> = {
+  "drone-shahed": "/icons/shahed.png",
+  "drone-recon": "/icons/orlan10.png",
+  "drone-unknown": "/icons/unknown.png",
 };
 
 // Great-circle bearing in degrees (0 = north, clockwise) from A to B —
@@ -179,11 +216,43 @@ function svgToImage(svg: string): Promise<HTMLImageElement> {
   });
 }
 
+// Rasterize a (possibly non-square) PNG into a square, aspect-preserving
+// ImageData so MapLibre can use it as a symbol. A 64 px canvas at pixelRatio 4
+// → ~16 logical px, matching the SVG icons registered above.
+function pngToImageData(url: string, size = 64): Promise<ImageData> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return reject(new Error("no 2d context"));
+      const scale = Math.min(size / img.width, size / img.height);
+      const w = img.width * scale;
+      const h = img.height * scale;
+      ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+      resolve(ctx.getImageData(0, 0, size, size));
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
 async function registerDroneIcons(map: MapLibreMap): Promise<void> {
   for (const [name, svg] of Object.entries(DRONE_ICONS)) {
     if (map.hasImage(name)) continue;
     const img = await svgToImage(svg);
     if (!map.hasImage(name)) map.addImage(name, img, { pixelRatio: 2 });
+  }
+  for (const [name, url] of Object.entries(DRONE_PNG_ICONS)) {
+    if (map.hasImage(name)) continue;
+    try {
+      const data = await pngToImageData(url);
+      if (!map.hasImage(name)) map.addImage(name, data, { pixelRatio: 4 });
+    } catch {
+      /* missing/broken icon asset — symbol layer falls back to default */
+    }
   }
 }
 
@@ -238,6 +307,13 @@ export function Map() {
     }
   }, [sheltersOn]);
 
+  // Reactive base-map mode — toggles the political basemap layer on/off.
+  const baseMap = useUiStore((s) => s.baseMap);
+  useEffect(() => {
+    const m = mapRef.current;
+    if (m) applyBaseMapStyle(m, baseMap);
+  }, [baseMap]);
+
   // Re-paint the choropleth scale when max_weight changes — keeps the
   // color stretch meaningful as the dataset grows or shrinks.
   useEffect(() => {
@@ -283,6 +359,23 @@ export function Map() {
 
     map.on("load", async () => {
       if (cancelled) return;
+
+      // Political basemap (added first → sits at the very bottom, above the
+      // background). Hidden unless the user switches to "political" mode.
+      map.addSource(POLITICAL_SOURCE, {
+        type: "raster",
+        tiles: POLITICAL_TILES,
+        tileSize: 256,
+        attribution:
+          '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · © <a href="https://carto.com/attributions">CARTO</a>',
+      });
+      map.addLayer({
+        id: POLITICAL_LAYER,
+        type: "raster",
+        source: POLITICAL_SOURCE,
+        layout: { visibility: "none" },
+      });
+
       const resp = await fetch("/geo/oblasts.geojson");
       if (cancelled) return;
       const geo = (await resp.json()) as GeoJSON.FeatureCollection;
@@ -507,15 +600,18 @@ export function Map() {
             "missile", "drone-missile",
             "kab", "drone-kab",
             "aviation", "drone-aviation",
-            "drone-shahed",
+            "unknown", "drone-unknown",
+            "drone-unknown",
           ],
           // ~40 px at country overview, ~28 px when zoomed in. Source
           // image is 32 px, so 1.4 == ~45 px on the canvas at z4.
+          // Grow with zoom so icons stay easy to tap on phones when zoomed in
+          // (they used to shrink, becoming near-impossible to hit on mobile).
           "icon-size": [
             "interpolate", ["linear"], ["zoom"],
-            4, 1.4,
-            6, 1.1,
-            8, 0.9,
+            4, 1.5,
+            6, 1.9,
+            9, 2.4,
           ],
           "icon-allow-overlap": true,
           // Don't reserve space in the collision index — otherwise a drone icon
@@ -589,13 +685,14 @@ export function Map() {
               "missile", "drone-missile",
               "kab", "drone-kab",
               "aviation", "drone-aviation",
-              "drone-shahed",
+              "unknown", "drone-unknown",
+              "drone-unknown",
             ],
             "icon-size": [
               "interpolate", ["linear"], ["zoom"],
-              4, 1.4,
-              6, 1.1,
-              8, 0.9,
+              4, 1.5,
+              6, 1.9,
+              9, 2.4,
             ],
             "icon-allow-overlap": true,
             "icon-ignore-placement": true,
@@ -933,6 +1030,7 @@ export function Map() {
       // Initial paint from current store state.
       applyAlertState();
       applySubState();
+      applyBaseMapStyle(map, useUiStore.getState().baseMap);
     });
 
     const applyAlertState = () => {

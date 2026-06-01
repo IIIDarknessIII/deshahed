@@ -10,6 +10,7 @@ import { PushSubscribe } from "@/components/PushSubscribe";
 import { AlertLegend } from "@/components/AlertLegend";
 import { SoundToggle } from "@/components/SoundToggle";
 import { ShelterToggle } from "@/components/ShelterToggle";
+import { BaseMapToggle } from "@/components/BaseMapToggle";
 import { Panel } from "@/components/Panel";
 
 const HEATMAP_PERIODS: { value: HeatmapPeriod; label: string }[] = [
@@ -83,6 +84,7 @@ export function StatsPanel() {
         <PushSubscribe />
         <SoundToggle />
         <ShelterToggle />
+        <BaseMapToggle />
         <Link
           href="/timelapse"
           className="flex w-full items-center justify-between rounded-md border border-border px-3 py-2 text-sm text-zinc-300 transition hover:border-zinc-600"
