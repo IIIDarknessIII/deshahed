@@ -67,23 +67,34 @@ LOCAL_SIM_MEDIUM = 0.7
 LOCAL_SIM_MIN = 0.5
 
 
-async def resolve_local(query: str, session: AsyncSession) -> GeocodingResult | None:
+async def resolve_local(
+    query: str, session: AsyncSession, *, oblast: str | None = None
+) -> GeocodingResult | None:
     q = normalize(query)
     if not q:
         return None
 
+    # When the report named an oblast, restrict matching to it so identically
+    # named settlements in other regions can't win (e.g. "Борова" in Kyiv obl.
+    # vs the Kharkiv-obl. one the message actually meant). On an in-oblast miss
+    # we return None, letting the caller fall back to that oblast's centroid.
+    oblast_clause = "AND oblast = :oblast" if oblast else ""
+    params: dict[str, object] = {"q": q}
+    if oblast:
+        params["oblast"] = oblast
+
     # Exact normalized match wins instantly; prefer cities over villages on ties.
     exact = await session.execute(
         text(
-            """
+            f"""
             SELECT lat, lon
             FROM settlements
-            WHERE name_normalized = :q
+            WHERE name_normalized = :q {oblast_clause}
             ORDER BY (type='city') DESC, (type='town') DESC, name
             LIMIT 1
             """
         ),
-        {"q": q},
+        params,
     )
     row = exact.first()
     if row is not None:
@@ -94,16 +105,16 @@ async def resolve_local(query: str, session: AsyncSession) -> GeocodingResult | 
     # paramstyle, so `%` doesn't need doubling in text().
     fuzzy = await session.execute(
         text(
-            """
+            f"""
             SELECT lat, lon, similarity(name_normalized, :q) AS sim
             FROM settlements
-            WHERE name_normalized % :q
+            WHERE name_normalized % :q {oblast_clause}
               AND similarity(name_normalized, :q) >= :sim_min
             ORDER BY (type='city') DESC, sim DESC
             LIMIT 1
             """
         ),
-        {"q": q, "sim_min": LOCAL_SIM_MIN},
+        {**params, "sim_min": LOCAL_SIM_MIN},
     )
     f = fuzzy.first()
     if f is None:
@@ -187,31 +198,35 @@ async def resolve_nominatim(
 # appears on the map (approximately) instead of being dropped. Stems are
 # already normalize()'d (lowercased, hyphens/apostrophes stripped) so they can
 # be substring-matched against a normalized query.
-OBLAST_FALLBACK: list[tuple[tuple[str, ...], float, float]] = [
-    (("вінниччин", "вінницьк"), 48.9785, 28.5489),
-    (("волинщин", "волинськ", "волинь", "волині"), 51.1381, 24.9369),
-    (("дніпропетровщин", "дніпропетровськ"), 48.2969, 35.1864),
-    (("донеччин", "донецьк"), 48.0628, 37.8485),
-    (("житомирщин", "житомирськ"), 50.6430, 28.3635),
-    (("закарпатт", "закарпатськ"), 48.4978, 23.0282),
-    (("запоріжж", "запорізьк"), 47.0953, 35.7598),
-    (("іванофранківщин", "іванофранківськ", "прикарпатт"), 48.6384, 24.6766),
-    (("київщин", "київська обл", "київської обл"), 50.3541, 31.4077),
-    (("кіровоградщин", "кіровоградськ"), 48.4860, 31.8346),
-    (("луганщин", "луганськ"), 48.9520, 38.9068),
-    (("львівщин", "львівськ"), 49.6925, 23.8913),
-    (("миколаївщин", "миколаївськ"), 47.4087, 31.9646),
-    (("одещин", "одеськ"), 46.7309, 30.5821),
-    (("полтавщин", "полтавськ"), 49.6238, 34.1095),
-    (("рівненщин", "рівненськ"), 50.9849, 26.6484),
-    (("сумщин", "сумськ"), 51.2294, 33.8669),
-    (("тернопільщин", "тернопільськ"), 49.3925, 25.4907),
-    (("харківщин", "харківськ"), 49.4868, 36.6841),
-    (("херсонщин", "херсонськ"), 46.7394, 33.4823),
-    (("хмельниччин", "хмельницьк"), 49.5209, 26.9424),
-    (("черкащин", "черкаськ"), 49.3370, 31.6360),
-    (("буковин", "чернівеччин", "чернівецьк"), 48.2011, 25.7734),
-    (("чернігівщин", "чернігівськ"), 51.3504, 31.8618),
+# Each entry: (matching stems, centroid lat, centroid lon, canonical oblast name
+# exactly as stored in settlements.oblast). The "-ськ"/"-цьк" stems also match the
+# "<Name>ська обл." qualifier the channels append, so the same table drives both
+# the centroid fallback and oblast-hint detection (detect_oblast).
+OBLAST_FALLBACK: list[tuple[tuple[str, ...], float, float, str]] = [
+    (("вінниччин", "вінницьк"), 48.9785, 28.5489, "Вінницька область"),
+    (("волинщин", "волинськ", "волинь", "волині"), 51.1381, 24.9369, "Волинська область"),
+    (("дніпропетровщин", "дніпропетровськ"), 48.2969, 35.1864, "Дніпропетровська область"),
+    (("донеччин", "донецьк"), 48.0628, 37.8485, "Донецька область"),
+    (("житомирщин", "житомирськ"), 50.6430, 28.3635, "Житомирська область"),
+    (("закарпатт", "закарпатськ"), 48.4978, 23.0282, "Закарпатська область"),
+    (("запоріжж", "запорізьк"), 47.0953, 35.7598, "Запорізька область"),
+    (("іванофранківщин", "іванофранківськ", "прикарпатт"), 48.6384, 24.6766, "Івано-Франківська область"),
+    (("київщин", "київська обл", "київської обл"), 50.3541, 31.4077, "Київська область"),
+    (("кіровоградщин", "кіровоградськ"), 48.4860, 31.8346, "Кіровоградська область"),
+    (("луганщин", "луганськ"), 48.9520, 38.9068, "Луганська область"),
+    (("львівщин", "львівськ"), 49.6925, 23.8913, "Львівська область"),
+    (("миколаївщин", "миколаївськ"), 47.4087, 31.9646, "Миколаївська область"),
+    (("одещин", "одеськ"), 46.7309, 30.5821, "Одеська область"),
+    (("полтавщин", "полтавськ"), 49.6238, 34.1095, "Полтавська область"),
+    (("рівненщин", "рівненськ"), 50.9849, 26.6484, "Рівненська область"),
+    (("сумщин", "сумськ"), 51.2294, 33.8669, "Сумська область"),
+    (("тернопільщин", "тернопільськ"), 49.3925, 25.4907, "Тернопільська область"),
+    (("харківщин", "харківськ"), 49.4868, 36.6841, "Харківська область"),
+    (("херсонщин", "херсонськ"), 46.7394, 33.4823, "Херсонська область"),
+    (("хмельниччин", "хмельницьк"), 49.5209, 26.9424, "Хмельницька область"),
+    (("черкащин", "черкаськ"), 49.3370, 31.6360, "Черкаська область"),
+    (("буковин", "чернівеччин", "чернівецьк"), 48.2011, 25.7734, "Чернівецька область"),
+    (("чернігівщин", "чернігівськ"), 51.3504, 31.8618, "Чернігівська область"),
 ]
 
 
@@ -219,9 +234,25 @@ def resolve_oblast_fallback(query: str) -> GeocodingResult | None:
     q = normalize(query)
     if not q:
         return None
-    for stems, lat, lon in OBLAST_FALLBACK:
+    for stems, lat, lon, _name in OBLAST_FALLBACK:
         if any(st in q for st in stems):
             return GeocodingResult(lat=lat, lon=lon, source="local", confidence="low")
+    return None
+
+
+def detect_oblast(value: str | None) -> str | None:
+    """Detect an oblast qualifier in free text (e.g. "(Харківська обл.)",
+    "Сумщина", "на Полтавщині") and return the canonical `settlements.oblast`
+    name, or None. Used to disambiguate same-named settlements across regions.
+    """
+    if not value:
+        return None
+    q = normalize(value)
+    if not q:
+        return None
+    for stems, _lat, _lon, name in OBLAST_FALLBACK:
+        if any(st in q for st in stems):
+            return name
     return None
 
 
@@ -231,13 +262,23 @@ async def resolve(
     query: str,
     session: AsyncSession,
     *,
+    oblast_hint: str | None = None,
     client: httpx.AsyncClient | None = None,
     skip_nominatim: bool = False,
 ) -> GeocodingResult:
-    """Resolve `query` to coordinates, escalating L1 → L2 and caching the verdict."""
+    """Resolve `query` to coordinates, escalating L1 → L2 and caching the verdict.
+
+    `oblast_hint` (canonical `settlements.oblast` name) restricts the local match
+    to that region so same-named settlements elsewhere can't win, and biases the
+    Nominatim query + centroid fallback toward it.
+    """
+    # Cache key folds in the oblast hint so the same name under different oblast
+    # contexts is cached independently (and never collides with the hint-less key).
+    cache_key = f"{query}@@{oblast_hint}" if oblast_hint else query
+
     # Cache hit
     cached = await session.execute(
-        select(GeocodeCache).where(GeocodeCache.query == query)
+        select(GeocodeCache).where(GeocodeCache.query == cache_key)
     )
     c = cached.scalar_one_or_none()
     if c is not None:
@@ -245,22 +286,27 @@ async def resolve(
             return GeocodingResult(lat=c.lat, lon=c.lon, source=c.source, confidence=c.confidence)
         # Cached negative — retry the oblast fallback before honoring the miss
         # (covers directional phrases poisoned into the cache earlier).
-        ob = resolve_oblast_fallback(query)
+        ob = resolve_oblast_fallback(oblast_hint or query)
         if ob is not None:
             return ob
         return GeocodingResult(lat=c.lat, lon=c.lon, source=c.source, confidence=c.confidence)
 
-    # L1 — settlements
-    result = await resolve_local(query, session)
+    # L1 — settlements (restricted to the hinted oblast when present)
+    result = await resolve_local(query, session, oblast=oblast_hint)
     # Oblast-level fallback — prefer the oblast centroid over a fuzzy remote guess.
+    # With a hint we go straight to that oblast's centroid; otherwise we scan the
+    # query text for a region phrase.
     if result is None or not result.found:
-        ob = resolve_oblast_fallback(query)
+        ob = resolve_oblast_fallback(oblast_hint) if oblast_hint else None
+        if ob is None:
+            ob = resolve_oblast_fallback(query)
         if ob is not None:
             result = ob
     if result is None or not result.found:
         # L2 (unless explicitly disabled — useful for unit tests)
         if not skip_nominatim:
-            l2 = await resolve_nominatim(query, client)
+            nq = f"{query}, {oblast_hint}" if oblast_hint else query
+            l2 = await resolve_nominatim(nq, client)
             if l2 is not None and l2.found:
                 result = l2
         if result is None or not result.found:
@@ -270,7 +316,7 @@ async def resolve(
     await session.execute(
         pg_insert(GeocodeCache)
         .values(
-            query=query,
+            query=cache_key,
             lat=result.lat,
             lon=result.lon,
             source=result.source,

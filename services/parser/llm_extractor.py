@@ -38,7 +38,7 @@ from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.db import dispose, get_redis, get_session_factory
-from app.geocoder import resolve as geocode_resolve
+from app.geocoder import detect_oblast, resolve as geocode_resolve
 from app.models import DroneEvent
 from app.schemas.drones import DroneAppearedMessage, DroneEventView, LLMEvent, LLMResponse
 
@@ -272,17 +272,23 @@ async def _persist_and_publish(
     redis = get_redis()
 
     async with factory() as session:
-        loc = await geocode_resolve(event.location, session)
+        # Disambiguate same-named settlements across oblasts: pull the oblast
+        # qualifier from the report ("Борова (Харківська обл.)") and pass it as a
+        # geocoding hint so we don't land on a like-named place near Kyiv.
+        oblast_hint = detect_oblast(event.location) or detect_oblast(raw_text)
+        loc = await geocode_resolve(event.location, session, oblast_hint=oblast_hint)
         if not loc.found:
             log.info(
-                "skipping event with unresolved location channel=%s msgid=%s loc=%r",
-                source_channel, source_message_id, event.location,
+                "skipping event with unresolved location channel=%s msgid=%s loc=%r oblast=%r",
+                source_channel, source_message_id, event.location, oblast_hint,
             )
             return
 
         direction = None
         if event.direction:
-            direction = await geocode_resolve(event.direction, session)
+            direction = await geocode_resolve(
+                event.direction, session, oblast_hint=oblast_hint
+            )
 
         new_source = {
             "channel": source_channel,
