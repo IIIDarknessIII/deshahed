@@ -1129,6 +1129,46 @@ export function Map() {
       if (!src || !tracksSrc || !arrowsSrc) return;
       const drones = Array.from(useDronesStore.getState().drones.values());
 
+      // Fan out objects that share (almost) the same coordinate so their icons
+      // don't stack on top of each other (common with the oblast-centroid
+      // fallback or repeated reports of one settlement). Group by rounded
+      // lng/lat and lay each member out on a phyllotaxis spiral around the
+      // shared point, sized in *pixels* (recomputed on zoomend) so the spacing
+      // stays constant on screen at any zoom.
+      const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+      const z = m.getZoom();
+      const iconPx = 16 * (
+        z <= 4 ? 1.5
+        : z >= 9 ? 2.4
+        : z < 6 ? 1.5 + (1.9 - 1.5) * (z - 4) / 2
+        : 1.9 + (2.4 - 1.9) * (z - 6) / 3
+      );
+      const step = iconPx * 1.15; // ≈ one icon between neighbours
+      const groups = new globalThis.Map<string, DroneEvent[]>();
+      for (const d of drones) {
+        const key = `${d.location_lon.toFixed(4)},${d.location_lat.toFixed(4)}`;
+        const g = groups.get(key);
+        if (g) g.push(d);
+        else groups.set(key, [d]);
+      }
+      const displayAt = new globalThis.Map<number, [number, number]>();
+      for (const members of groups.values()) {
+        if (members.length === 1) {
+          const d = members[0];
+          displayAt.set(d.id, [d.location_lon, d.location_lat]);
+          continue;
+        }
+        const c = m.project([members[0].location_lon, members[0].location_lat]);
+        members.forEach((d, i) => {
+          const r = step * Math.sqrt(i + 0.5);
+          const a = (i + 0.5) * GOLDEN_ANGLE;
+          const p = m.unproject([c.x + r * Math.cos(a), c.y + r * Math.sin(a)]);
+          displayAt.set(d.id, [p.lng, p.lat]);
+        });
+      }
+      const coordOf = (d: DroneEvent): [number, number] =>
+        displayAt.get(d.id) ?? [d.location_lon, d.location_lat];
+
       const bearingOf = (d: DroneEvent): number =>
         d.direction_lat !== null && d.direction_lon !== null
           ? bearingDeg(d.location_lat, d.location_lon, d.direction_lat, d.direction_lon)
@@ -1139,7 +1179,7 @@ export function Map() {
         features: drones.map(
           (d: DroneEvent): GeoJSON.Feature => ({
             type: "Feature",
-            geometry: { type: "Point", coordinates: [d.location_lon, d.location_lat] },
+            geometry: { type: "Point", coordinates: coordOf(d) },
             properties: {
               id: d.id,
               event_type: d.event_type,
@@ -1161,7 +1201,7 @@ export function Map() {
             geometry: {
               type: "LineString",
               coordinates: [
-                [d.location_lon, d.location_lat],
+                coordOf(d),
                 [d.direction_lon as number, d.direction_lat as number],
               ],
             },
@@ -1233,6 +1273,9 @@ export function Map() {
     const unsubscribeSub = useAlertsStore.subscribe(applySubState);
     const unsubscribeDrones = useDronesStore.subscribe(applyDroneState);
     const unsubscribeTracks = useTracksStore.subscribe(applyTracksState);
+    // Re-fan colocated objects on zoom change so the on-screen spacing between
+    // them stays constant (the offsets are computed in pixels).
+    map.on("zoomend", applyDroneState);
 
     const onPushRegionChange = () => applyAlertState();
     window.addEventListener("storage", onPushRegionChange);
@@ -1244,6 +1287,7 @@ export function Map() {
       unsubscribeSub();
       unsubscribeDrones();
       unsubscribeTracks();
+      map.off("zoomend", applyDroneState);
       window.removeEventListener("storage", onPushRegionChange);
       window.removeEventListener(PUSH_REGION_EVENT, onPushRegionChange);
       map.remove();
