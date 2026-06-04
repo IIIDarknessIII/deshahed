@@ -12,7 +12,7 @@ from app.config import get_settings
 from app.db import dispose, get_session_factory
 from app.heatmap_worker import loop as heatmap_loop
 from app.push import loop as push_loop
-from app.routes import alerts, aviation, drones, health, heatmap, iot, presence, push as push_routes, tracks, ws_alerts
+from app.routes import alerts, aviation, drones, health, heatmap, iot, presence, push as push_routes, tracks, ua_webhook, ws_alerts
 
 log = logging.getLogger("uvicorn.error").getChild("lifespan")
 
@@ -113,6 +113,7 @@ def create_app() -> FastAPI:
     app.include_router(iot.router)
     app.include_router(aviation.router)
     app.include_router(presence.router)
+    app.include_router(ua_webhook.router)
     app.include_router(ws_alerts.router)
     return app
 

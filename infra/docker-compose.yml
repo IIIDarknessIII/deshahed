@@ -52,6 +52,10 @@ services:
       # owns the live ingestion path; the api just needs its own copy of the
       # bearer to relay alerts.in.ua's iot endpoints with caching.
       ALERTS_API_TOKEN: ${ALERTS_API_TOKEN:-}
+      # Shared secret the ukrainealarm webhook receiver (/api/v1/ua/webhook)
+      # validates before publishing a ua:kick. Must match the ?secret= in the
+      # URL the poller registers (UA_WEBHOOK_URL).
+      UA_WEBHOOK_SECRET: ${UA_WEBHOOK_SECRET:-}
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:
@@ -96,6 +100,11 @@ services:
       # `:?` failure here would break unrelated services. Default to empty and let
       # the poller refuse to start with a clear message (see alerts_poller.py).
       ALERTS_API_TOKEN: ${ALERTS_API_TOKEN:-}
+      # ukrainealarm webhook source — optional. Empty UA_API_TOKEN disables it
+      # and the engine runs alerts.in.ua only (see alerts_poller.AlertEngine).
+      UA_API_TOKEN: ${UA_API_TOKEN:-}
+      UA_WEBHOOK_URL: ${UA_WEBHOOK_URL:-}
+      UA_WEBHOOK_SECRET: ${UA_WEBHOOK_SECRET:-}
     depends_on:
       api:
         condition: service_healthy
