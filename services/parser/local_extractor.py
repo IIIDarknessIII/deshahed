@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 
 import pymorphy3
 
-from app.schemas.drones import ConfidenceLevel, DroneEventType, LLMEvent, LLMResponse
+from app.schemas.drones import DroneEventType, LLMEvent
 from .gazetteer import Gazetteer, Hit, normalize_search
 
 log = logging.getLogger("local_extractor")

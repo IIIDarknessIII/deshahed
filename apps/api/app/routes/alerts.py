@@ -150,7 +150,6 @@ async def get_alerts_history(
 @router.get("/stats/summary", response_model=SummaryResponse)
 async def get_stats_summary(period: Period = Query("week")) -> SummaryResponse:
     start = _period_start(period)
-    now = datetime.now(timezone.utc)
 
     duration_expr = func.extract(
         "epoch",

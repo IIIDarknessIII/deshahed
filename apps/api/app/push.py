@@ -11,10 +11,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from datetime import datetime, timezone
 
 from pywebpush import WebPushException, webpush
-from sqlalchemy import delete, text
+from sqlalchemy import text
 
 from app.config import get_settings
 from app.db import get_redis, get_session_factory
@@ -89,10 +88,7 @@ async def _broadcast_alert(alert: dict) -> None:
             elif status in (404, 410):
                 dead_ids.append(r.id)
         if dead_ids:
-            await session.execute(
-                delete(get_settings().__class__).where(False)  # no-op type placeholder
-            )
-            # Actually delete subscriptions by id.
+            # Prune subscriptions the push service reported as gone (404/410).
             await session.execute(
                 text("DELETE FROM push_subscriptions WHERE id = ANY(:ids)"),
                 {"ids": dead_ids},
@@ -100,7 +96,7 @@ async def _broadcast_alert(alert: dict) -> None:
             await session.commit()
         log.info(
             "push: alert uid=%s sent=%d/%d removed_stale=%d",
-            location_uid, sent_ok, len(rows), len(dead_ids),
+            alert.get("location_uid", ""), sent_ok, len(rows), len(dead_ids),
         )
 
 
