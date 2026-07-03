@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import maplibregl, { type Map as MapLibreMap } from "maplibre-gl";
+import maplibregl, {
+  type Map as MapLibreMap,
+  type ExpressionSpecification,
+} from "maplibre-gl";
 import {
   useAlertsStore,
   selectOblastAggregate,
@@ -86,6 +89,47 @@ const HROMADAS_LINE = "hromadas-line";
 const RAION_MIN_ZOOM = 6;
 const HROMADA_MIN_ZOOM = 7.5;
 
+// ---- Single-source map style expressions ----------------------------------
+// These MapLibre `match` expressions were previously copy-pasted at each layer.
+// Hoisting them here means an alert state or object type has exactly one colour
+// and one sprite across the oblast fill, sub-region fill, drone points, tracks
+// and trajectories.
+
+// Alert-state → choropleth fill colour (oblast + sub-region fills).
+const STATE_FILL_COLOR: ExpressionSpecification = [
+  "match",
+  ["get", "state"],
+  "urban_fights", "#a855f7",
+  "artillery_shelling", "#f97316",
+  "air_raid", "#ef4444",
+  "#1f2937",
+];
+
+// event_type → line/point colour (drone points, dashed tracks, trajectories).
+const EVENT_TYPE_COLOR: ExpressionSpecification = [
+  "match",
+  ["get", "event_type"],
+  "shahed", "#fb923c",
+  "recon", "#2dd4bf",
+  "missile", "#dc2626",
+  "kab", "#a855f7",
+  "aviation", "#38bdf8",
+  "#9ca3af",
+];
+
+// event_type → registered sprite name (drone points + trajectory heads).
+const EVENT_TYPE_ICON: ExpressionSpecification = [
+  "match",
+  ["get", "event_type"],
+  "shahed", "drone-shahed",
+  "recon", "drone-recon",
+  "missile", "drone-missile",
+  "kab", "drone-kab",
+  "aviation", "drone-aviation",
+  "unknown", "drone-unknown",
+  "drone-unknown",
+];
+
 // Shared choropleth paint for the sub-region fills. "safe" is fully
 // transparent so only regions with an active alert tint the map.
 const SUBREGION_FILL_PAINT: maplibregl.FillLayerSpecification["paint"] = {
@@ -94,14 +138,7 @@ const SUBREGION_FILL_PAINT: maplibregl.FillLayerSpecification["paint"] = {
     // Hovered region with no active alert → neutral sky highlight so it reads.
     ["all", ["boolean", ["feature-state", "hover"], false], ["==", ["get", "state"], "safe"]],
     "#38bdf8",
-    [
-      "match",
-      ["get", "state"],
-      "urban_fights", "#a855f7",
-      "artillery_shelling", "#f97316",
-      "air_raid", "#ef4444",
-      "#1f2937",
-    ],
+    STATE_FILL_COLOR,
   ],
   // Hover bumps the fill so the region under the cursor is obvious, even when safe.
   "fill-opacity": [
@@ -397,14 +434,7 @@ export function Map() {
         // country-overview band.
         maxzoom: RAION_MIN_ZOOM,
         paint: {
-          "fill-color": [
-            "match",
-            ["get", "state"],
-            "urban_fights", "#a855f7",
-            "artillery_shelling", "#f97316",
-            "air_raid", "#ef4444",
-            "#1f2937",
-          ],
+          "fill-color": STATE_FILL_COLOR,
           "fill-opacity": [
             "match",
             ["get", "state"],
@@ -572,16 +602,7 @@ export function Map() {
         type: "line",
         source: DRONE_TRACKS_SOURCE,
         paint: {
-          "line-color": [
-            "match",
-            ["get", "event_type"],
-            "shahed", "#fb923c",
-            "recon", "#2dd4bf",
-            "missile", "#dc2626",
-            "kab", "#a855f7",
-            "aviation", "#38bdf8",
-            "#9ca3af",
-          ],
+          "line-color": EVENT_TYPE_COLOR,
           "line-width": 1.2,
           "line-opacity": 0.7,
           "line-dasharray": [2, 1.5],
@@ -592,17 +613,7 @@ export function Map() {
         type: "symbol",
         source: DRONES_SOURCE,
         layout: {
-          "icon-image": [
-            "match",
-            ["get", "event_type"],
-            "shahed", "drone-shahed",
-            "recon", "drone-recon",
-            "missile", "drone-missile",
-            "kab", "drone-kab",
-            "aviation", "drone-aviation",
-            "unknown", "drone-unknown",
-            "drone-unknown",
-          ],
+          "icon-image": EVENT_TYPE_ICON,
           // ~40 px at country overview, ~28 px when zoomed in. Source
           // image is 32 px, so 1.4 == ~45 px on the canvas at z4.
           // Grow with zoom so icons stay easy to tap on phones when zoomed in
@@ -652,16 +663,7 @@ export function Map() {
           source: TRAJECTORIES_SOURCE,
           filter: ["==", ["geometry-type"], "LineString"],
           paint: {
-            "line-color": [
-              "match",
-              ["get", "event_type"],
-              "shahed", "#fb923c",
-              "recon", "#2dd4bf",
-              "missile", "#dc2626",
-              "kab", "#a855f7",
-              "aviation", "#38bdf8",
-              "#9ca3af",
-            ],
+            "line-color": EVENT_TYPE_COLOR,
             "line-width": 2,
             "line-opacity": 0.85,
           },
@@ -677,17 +679,7 @@ export function Map() {
           source: TRAJECTORIES_SOURCE,
           filter: ["==", ["geometry-type"], "Point"],
           layout: {
-            "icon-image": [
-              "match",
-              ["get", "event_type"],
-              "shahed", "drone-shahed",
-              "recon", "drone-recon",
-              "missile", "drone-missile",
-              "kab", "drone-kab",
-              "aviation", "drone-aviation",
-              "unknown", "drone-unknown",
-              "drone-unknown",
-            ],
+            "icon-image": EVENT_TYPE_ICON,
             "icon-size": [
               "interpolate", ["linear"], ["zoom"],
               4, 1.5,
