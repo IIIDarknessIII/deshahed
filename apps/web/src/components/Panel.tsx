@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useUiStore, type MobileSheet } from "@/stores/uiStore";
+import { cn } from "@/lib/cn";
 
 /**
  * Shared responsive shell for the side panels.
@@ -54,25 +55,25 @@ export function Panel({
           ? { transform: `translateY(${dragY}px)`, transition: "none" }
           : undefined
       }
-      className={
-        "flex flex-col border-border bg-bg/95 backdrop-blur transition-transform duration-300 ease-out " +
-        // Desktop: static sidebar.
-        "md:relative md:h-full md:w-80 md:shrink-0 md:translate-y-0 md:rounded-none md:border-x-0 md:border-t-0 md:shadow-none " +
-        (side === "left" ? "md:border-r " : "md:border-l ") +
-        // Mobile: rounded bottom sheet.
-        "fixed inset-x-0 bottom-0 z-40 h-[82dvh] max-h-[82dvh] rounded-t-2xl border-x border-t shadow-2xl " +
-        (open ? "translate-y-0" : "translate-y-full md:translate-y-0")
-      }
+      className={cn(
+        "flex flex-col border-border bg-surface/95 backdrop-blur-xl transition-transform duration-300 ease-out",
+        // Desktop: static sidebar with a soft edge shadow toward the map.
+        "md:relative md:h-full md:w-80 md:shrink-0 md:translate-y-0 md:rounded-none md:border-x-0 md:border-t-0 md:shadow-panel",
+        side === "left" ? "md:border-r" : "md:border-l",
+        // Mobile: rounded bottom sheet that floats above the map.
+        "fixed inset-x-0 bottom-0 z-40 h-[82dvh] max-h-[82dvh] rounded-t-2xl border-x border-t shadow-float",
+        open ? "translate-y-0" : "translate-y-full md:translate-y-0",
+      )}
     >
       {/* Grab handle — drag down to dismiss (mobile only). */}
       <div
-        className="shrink-0 cursor-grab touch-none pb-1 pt-2.5 active:cursor-grabbing md:hidden"
+        className="group shrink-0 cursor-grab touch-none pb-1 pt-3 active:cursor-grabbing md:hidden"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
       >
-        <div className="mx-auto h-1.5 w-10 rounded-full bg-zinc-700" />
+        <div className="mx-auto h-1.5 w-10 rounded-full bg-border-strong transition-colors group-active:bg-fg-faint" />
       </div>
       {children}
     </aside>

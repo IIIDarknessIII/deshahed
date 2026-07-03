@@ -83,22 +83,22 @@ export function InstallPrompt() {
   if (!show) return null;
 
   return (
-    <div className="relative z-20 shrink-0 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur md:hidden">
+    <div className="relative z-20 shrink-0 border-t border-border bg-surface/95 px-4 py-3 backdrop-blur-xl md:hidden">
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-zinc-800 text-zinc-100">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-accent/25 bg-accent/10 text-accent">
           <Smartphone size={20} />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold text-zinc-100">
+          <div className="text-sm font-semibold text-fg">
             Встановити застосунок
           </div>
           {ios ? (
-            <div className="text-[11px] leading-snug text-zinc-400">
+            <div className="text-[11px] leading-snug text-fg-muted">
               Натисніть <Share2 size={11} className="-mt-0.5 inline" /> унизу та
               «На екран “Домівка”»
             </div>
           ) : (
-            <div className="text-[11px] text-zinc-400">
+            <div className="text-[11px] text-fg-muted">
               Швидкий доступ до карти просто з екрана телефону
             </div>
           )}
@@ -107,7 +107,7 @@ export function InstallPrompt() {
           <button
             type="button"
             onClick={install}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-zinc-100 px-3 py-2 text-sm font-medium text-zinc-900 active:scale-95"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-fg px-3 py-2 text-sm font-semibold text-bg transition active:scale-95"
           >
             <Download size={15} />
             Встановити
@@ -117,7 +117,7 @@ export function InstallPrompt() {
           type="button"
           onClick={dismiss}
           aria-label="Сховати"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-fg-subtle transition-colors hover:bg-surface-3 hover:text-fg"
         >
           <X size={18} />
         </button>

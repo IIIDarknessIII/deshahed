@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Bell, BellOff, ChevronDown } from "lucide-react";
 import { ENV } from "@/lib/env";
 import { REGIONS } from "@/lib/regions";
+import { ToggleRow } from "@/components/ui/ToggleRow";
 
 type State = "checking" | "unsupported" | "disabled" | "denied" | "off" | "on" | "loading";
 
@@ -142,45 +143,31 @@ export function PushSubscribe() {
         <select
           value={region}
           onChange={(e) => onRegionChange(e.target.value)}
-          className="w-full appearance-none rounded-md border border-border bg-bg/60 px-3 py-2 pr-8 text-sm text-zinc-100"
+          aria-label="Область для сповіщень"
+          className="w-full cursor-pointer appearance-none rounded-lg border border-border bg-surface-2/60 px-3 py-2.5 pr-8 text-sm text-fg transition-colors hover:border-border-strong focus:border-accent/60"
         >
           <option value={ALL_UA}>Уся Україна</option>
           {REGIONS.map((r) => (
             <option key={r.full_name_uk} value={r.full_name_uk}>{r.full_name_uk}</option>
           ))}
         </select>
-        <ChevronDown size={14} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500" />
+        <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-subtle" />
       </div>
 
       {state === "denied" ? (
-        <div className="flex w-full items-center gap-2 rounded-md border border-border px-3 py-2 text-xs text-zinc-500">
-          <BellOff size={14} /> Сповіщення заборонені у налаштуваннях браузера
+        <div className="flex w-full items-center gap-2 rounded-lg border border-border bg-surface-2/40 px-3 py-2.5 text-xs text-fg-subtle">
+          <BellOff size={14} className="shrink-0" /> Сповіщення заборонені у налаштуваннях браузера
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={() => (state === "on" ? unsubscribeNow() : subscribeNow(region))}
+        <ToggleRow
+          icon={<Bell size={15} />}
+          label={state === "on" ? "Сповіщення увімкнені" : "Увімкнути сповіщення"}
+          active={state === "on"}
+          accent="safe"
+          busy={state === "loading"}
           disabled={state === "loading"}
-          className={
-            "flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm transition " +
-            (state === "on"
-              ? "border-emerald-600/60 bg-emerald-600/10 text-emerald-300"
-              : "border-border text-zinc-300 hover:border-zinc-600")
-          }
-          aria-pressed={state === "on"}
-        >
-          <span className="flex items-center gap-2">
-            <Bell size={14} />
-            {state === "loading"
-              ? "Зачекайте…"
-              : state === "on"
-                ? "Сповіщення увімкнені"
-                : "Увімкнути сповіщення"}
-          </span>
-          <span className="text-[10px] uppercase tracking-wide">
-            {state === "on" ? "увімк." : "вимк."}
-          </span>
-        </button>
+          onClick={() => (state === "on" ? unsubscribeNow() : subscribeNow(region))}
+        />
       )}
     </div>
   );

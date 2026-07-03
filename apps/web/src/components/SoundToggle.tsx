@@ -8,6 +8,7 @@ import {
   unlockAudio,
   subscribedOblast,
 } from "@/lib/sound";
+import { ToggleRow } from "@/components/ui/ToggleRow";
 
 export function SoundToggle() {
   const [on, setOn] = useState(false);
@@ -35,8 +36,11 @@ export function SoundToggle() {
   };
 
   return (
-    <button
-      type="button"
+    <ToggleRow
+      icon={on ? <Volume2 size={15} /> : <VolumeX size={15} />}
+      label={on ? "Сирена увімкнена" : "Увімкнути сирену"}
+      active={on}
+      accent="warn"
       onClick={toggle}
       disabled={!hasRegion}
       title={
@@ -44,21 +48,6 @@ export function SoundToggle() {
           ? "Звукова сирена та озвучка для підписаної області"
           : "Спочатку оберіть область вище"
       }
-      className={
-        "flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm transition " +
-        (on
-          ? "border-amber-500/60 bg-amber-500/10 text-amber-300"
-          : "border-border text-zinc-300 hover:border-zinc-600 disabled:cursor-not-allowed disabled:opacity-50")
-      }
-      aria-pressed={on}
-    >
-      <span className="flex items-center gap-2">
-        {on ? <Volume2 size={14} /> : <VolumeX size={14} />}
-        {on ? "Сирена увімкнена" : "Увімкнути сирену"}
-      </span>
-      <span className="text-[10px] uppercase tracking-wide">
-        {on ? "увімк." : "вимк."}
-      </span>
-    </button>
+    />
   );
 }

@@ -15,3 +15,22 @@ export const ALERT_TYPE_LABEL_UK: Record<AlertType, string> = {
 export function alertTypeLabel(t: AlertType | string): string {
   return ALERT_TYPE_LABEL_UK[t as AlertType] ?? "Невідомий тип загрози";
 }
+
+/**
+ * Semantic accent per alert type — a single source shared by the alerts panel,
+ * legend and (eventually) the map paint. Values are design-token keys.
+ */
+export type AlertAccent = "alert" | "artillery" | "street" | "warn" | "muted";
+
+export const ALERT_TYPE_ACCENT: Record<AlertType, AlertAccent> = {
+  air_raid: "alert",
+  artillery_shelling: "artillery",
+  urban_fights: "street",
+  chemical: "warn",
+  nuclear: "warn",
+  unknown: "muted",
+};
+
+export function alertTypeAccent(t: AlertType | string): AlertAccent {
+  return ALERT_TYPE_ACCENT[t as AlertType] ?? "muted";
+}

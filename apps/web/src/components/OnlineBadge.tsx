@@ -2,6 +2,7 @@
 
 import { Users } from "lucide-react";
 import { useOnline } from "@/hooks/useOnline";
+import { LiveDot } from "@/components/ui/LiveDot";
 
 export function OnlineBadge() {
   const { data } = useOnline();
@@ -9,12 +10,12 @@ export function OnlineBadge() {
   if (n <= 0) return null;
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-300"
+      className="inline-flex items-center gap-1.5 rounded-full border border-safe/25 bg-safe/10 px-2 py-0.5 text-[11px] font-medium text-safe"
       title="Скільки людей зараз на сайті"
     >
-      <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+      <LiveDot color="safe" size={6} />
       <Users size={11} />
-      <span className="tabular-nums">{n}</span>
+      <span className="font-mono tabular-nums">{n}</span>
     </span>
   );
 }

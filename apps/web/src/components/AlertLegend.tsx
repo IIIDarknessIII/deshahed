@@ -1,10 +1,10 @@
 "use client";
 
 const ITEMS: { label: string; color: string }[] = [
-  { label: "Повітряна тривога", color: "bg-red-500/60" },
-  { label: "Загроза артобстрілу", color: "bg-orange-500/60" },
-  { label: "Загроза вуличних боїв", color: "bg-purple-500/70" },
-  { label: "Немає інформації про тривогу", color: "bg-zinc-800/80" },
+  { label: "Повітряна тривога", color: "bg-alert/60" },
+  { label: "Загроза артобстрілу", color: "bg-artillery/60" },
+  { label: "Загроза вуличних боїв", color: "bg-street/70" },
+  { label: "Немає інформації про тривогу", color: "bg-surface-3" },
 ];
 
 // Compact glyphs mirroring the on-map icons (viewBox matches Map.tsx).
@@ -81,32 +81,32 @@ const ICONS: { node: React.ReactNode; label: string }[] = [
 
 export function AlertLegend() {
   return (
-    <div className="rounded-md border border-border p-3">
-      <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+    <div className="rounded-lg border border-border bg-surface-2/40 p-3">
+      <div className="mb-2 text-[11px] font-medium uppercase tracking-wider text-fg-subtle">
         Стани
       </div>
       <ul className="space-y-1.5">
         {ITEMS.map((it) => (
-          <li key={it.label} className="flex items-center gap-2 text-[12px] text-zinc-300">
-            <span className={`inline-block h-3 w-3 rounded-sm ${it.color}`} />
+          <li key={it.label} className="flex items-center gap-2.5 text-[12px] text-fg-muted">
+            <span className={`inline-block h-3 w-3 rounded-sm ring-1 ring-inset ring-white/10 ${it.color}`} />
             <span>{it.label}</span>
           </li>
         ))}
       </ul>
 
-      <div className="mb-2 mt-3 border-t border-border/60 pt-2.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+      <div className="mb-2 mt-3 border-t border-border/60 pt-2.5 text-[11px] font-medium uppercase tracking-wider text-fg-subtle">
         Значки
       </div>
       <ul className="space-y-1.5">
         {ICONS.map((it) => (
-          <li key={it.label} className="flex items-center gap-2 text-[12px] text-zinc-300">
+          <li key={it.label} className="flex items-center gap-2.5 text-[12px] text-fg-muted">
             {it.node}
             <span>{it.label}</span>
           </li>
         ))}
       </ul>
 
-      <div className="mt-2.5 border-t border-border/60 pt-2 text-[11px] leading-snug text-zinc-500">
+      <div className="mt-2.5 border-t border-border/60 pt-2 text-[11px] leading-snug text-fg-faint">
         Наближайте карту, щоб побачити ситуацію по районах і громадах.
       </div>
     </div>

@@ -33,9 +33,9 @@ export function DownloadAppButton() {
       href="/deshahed.apk"
       download
       title="Завантажити застосунок для Android"
-      className="group absolute bottom-3 right-3 z-20 inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-bg/80 px-3 py-1.5 text-xs font-medium text-emerald-200 shadow-lg backdrop-blur transition hover:border-emerald-400/80 hover:bg-emerald-500/15 active:scale-95"
+      className="group absolute bottom-3 right-3 z-20 inline-flex items-center gap-1.5 rounded-full border border-safe/40 bg-surface/80 px-3 py-1.5 text-xs font-medium text-safe/90 shadow-float backdrop-blur transition hover:border-safe/80 hover:bg-safe/15 hover:text-safe active:scale-95"
     >
-      <Download size={14} className="text-emerald-400 transition group-hover:text-emerald-300" />
+      <Download size={14} className="text-safe transition group-hover:text-safe" />
       <span>Android-застосунок</span>
     </a>
   );
