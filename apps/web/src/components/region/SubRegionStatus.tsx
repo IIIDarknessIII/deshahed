@@ -7,14 +7,14 @@ import { formatDuration } from "@/lib/format";
 import type { OblastAlertState } from "@/lib/types";
 
 const META: Record<Exclude<OblastAlertState, "safe">, { label: string; cls: string }> = {
-  air_raid: { label: "Повітряна тривога", cls: "border-red-500/50 bg-red-500/10 text-red-300" },
+  air_raid: { label: "Повітряна тривога", cls: "border-alert/50 bg-alert/10 text-alert" },
   artillery_shelling: {
     label: "Загроза артобстрілу",
-    cls: "border-orange-500/50 bg-orange-500/10 text-orange-300",
+    cls: "border-artillery/50 bg-artillery/10 text-artillery",
   },
   urban_fights: {
     label: "Загроза вуличних боїв",
-    cls: "border-purple-500/50 bg-purple-500/10 text-purple-300",
+    cls: "border-street/50 bg-street/10 text-street",
   },
 };
 
@@ -43,8 +43,8 @@ export function SubRegionStatus({ mkey, initial }: { mkey: string; initial?: Ini
 
   if (!sr) {
     return (
-      <div className="flex items-center gap-2 rounded-md border border-emerald-600/50 bg-emerald-600/10 px-4 py-3 text-sm text-emerald-300">
-        <span className="inline-flex h-2.5 w-2.5 animate-pulse rounded-full bg-emerald-400" />
+      <div className="flex items-center gap-2 rounded-md border border-safe/50 bg-safe/10 px-4 py-3 text-sm text-safe">
+        <span className="inline-flex h-2.5 w-2.5 animate-pulse rounded-full bg-safe" />
         Зараз тривоги немає
       </div>
     );
@@ -58,7 +58,7 @@ export function SubRegionStatus({ mkey, initial }: { mkey: string; initial?: Ini
         <span className="inline-flex h-2.5 w-2.5 animate-pulse rounded-full bg-current" />
         Зараз: {meta.label}
       </span>
-      <span className="shrink-0 tabular-nums opacity-80">{since}</span>
+      <span className="shrink-0 font-mono tabular-nums opacity-80">{since}</span>
     </div>
   );
 }

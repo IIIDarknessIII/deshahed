@@ -37,8 +37,8 @@ const SCHEMA = {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="space-y-2">
-      <h2 className="text-base font-semibold text-zinc-100">{title}</h2>
-      <div className="space-y-2 text-sm leading-relaxed text-zinc-400">{children}</div>
+      <h2 className="text-base font-semibold text-fg">{title}</h2>
+      <div className="space-y-2 text-sm leading-relaxed text-fg-muted">{children}</div>
     </section>
   );
 }
@@ -50,22 +50,22 @@ export default function AboutPage() {
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
           <Link
             href="/"
-            className="inline-flex items-center gap-1 rounded p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+            className="inline-flex items-center gap-1 rounded p-1.5 text-fg-muted hover:bg-surface-2 hover:text-fg"
             aria-label="До карти"
           >
             <ArrowLeft size={18} />
           </Link>
           <div>
-            <div className="text-base font-semibold text-zinc-100">Про проєкт</div>
-            <div className="text-xs text-zinc-500">deshahed</div>
+            <div className="text-base font-semibold text-fg">Про проєкт</div>
+            <div className="text-xs text-fg-subtle">deshahed</div>
           </div>
         </div>
       </header>
 
       <div className="mx-auto max-w-3xl space-y-7 px-4 py-6 pb-[max(2rem,var(--safe-bottom))]">
-        <h1 className="text-2xl font-semibold text-zinc-100">Про проєкт deshahed</h1>
-        <p className="text-sm leading-relaxed text-zinc-300">
-          <strong className="text-zinc-100">deshahed</strong> — це безкоштовна інтерактивна
+        <h1 className="text-2xl font-semibold text-fg">Про проєкт deshahed</h1>
+        <p className="text-sm leading-relaxed text-fg-muted">
+          <strong className="text-fg">deshahed</strong> — це безкоштовна інтерактивна
           карта повітряних тривог та повідомлень про БпЛА і ракетну небезпеку в Україні
           в реальному часі. Проєкт зібрано з відкритих джерел, щоб одним поглядом бачити
           загальну картину по всій країні — від областей до окремих громад.
@@ -74,21 +74,21 @@ export default function AboutPage() {
         <Section title="Джерела даних">
           <ul className="list-disc space-y-1.5 pl-5">
             <li>
-              <strong className="text-zinc-200">Повітряні тривоги</strong> — публічні дані
-              сервісу <span className="text-zinc-200">alerts.in.ua</span> (області, райони,
+              <strong className="text-fg">Повітряні тривоги</strong> — публічні дані
+              сервісу <span className="text-fg">alerts.in.ua</span> (області, райони,
               громади, міста).
             </li>
             <li>
-              <strong className="text-zinc-200">БпЛА та ракети</strong> — OSINT-моніторинг
+              <strong className="text-fg">БпЛА та ракети</strong> — OSINT-моніторинг
               відкритих Telegram-каналів, що повідомляють про рух «шахедів», ракет та КАБів;
               текст автоматично розпізнається та геокодується.
             </li>
             <li>
-              <strong className="text-zinc-200">Межі регіонів</strong> — OpenStreetMap
+              <strong className="text-fg">Межі регіонів</strong> — OpenStreetMap
               (© OSM contributors, ODbL): області, райони та територіальні громади.
             </li>
             <li>
-              <strong className="text-zinc-200">Укриття</strong> — позначки укриттів з
+              <strong className="text-fg">Укриття</strong> — позначки укриттів з
               OpenStreetMap (увімкніть шар на карті).
             </li>
           </ul>
@@ -102,9 +102,9 @@ export default function AboutPage() {
             у бік свого руху, а стрілка позначає напрямок прильоту.
           </p>
           <p>
-            Доступні також <Link className="underline hover:text-zinc-200" href="/stats">статистика</Link>,{" "}
-            <Link className="underline hover:text-zinc-200" href="/timelapse">тайм-лапс за добу</Link> та
-            сторінки кожного <Link className="underline hover:text-zinc-200" href="/regions">регіону</Link>.
+            Доступні також <Link className="underline hover:text-fg" href="/stats">статистика</Link>,{" "}
+            <Link className="underline hover:text-fg" href="/timelapse">тайм-лапс за добу</Link> та
+            сторінки кожного <Link className="underline hover:text-fg" href="/regions">регіону</Link>.
           </p>
         </Section>
 
@@ -116,11 +116,11 @@ export default function AboutPage() {
           <a
             href="/deshahed.apk"
             download
-            className="inline-flex items-center gap-2 rounded-md border border-emerald-600/60 bg-emerald-600/10 px-4 py-2.5 text-sm font-medium text-emerald-200 transition hover:bg-emerald-600/20"
+            className="inline-flex items-center gap-2 rounded-lg border border-safe/60 bg-safe/10 px-4 py-2.5 text-sm font-medium text-safe transition hover:bg-safe/20"
           >
             ⬇ Завантажити APK для Android
           </a>
-          <p className="text-[12px] text-zinc-500">
+          <p className="text-[12px] text-fg-subtle">
             Після завантаження відкрийте файл і дозвольте встановлення з цього
             джерела. На iPhone застосунку немає — відкрийте сайт у Safari та
             додайте на головний екран.
@@ -128,7 +128,7 @@ export default function AboutPage() {
         </Section>
 
         <Section title="Важливо — це не офіційне джерело">
-          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-amber-100">
+          <div className="rounded-lg border border-warn/40 bg-warn/10 p-3 text-warn">
             Дані зібрані з відкритих джерел (OSINT) і можуть містити затримки, помилки або
             неповну інформацію. <strong>Не приймайте рішення про власну безпеку лише на основі
             цієї карти.</strong> Офіційне джерело сповіщень — застосунок «Повітряна тривога»
@@ -139,13 +139,13 @@ export default function AboutPage() {
         <Section title="Безкоштовно та відкрито">
           <p>
             Проєкт безкоштовний і без реклами. Ви можете безкоштовно вбудувати{" "}
-            <Link className="underline hover:text-zinc-200" href="/embed">віджет статусу тривоги</Link>{" "}
+            <Link className="underline hover:text-fg" href="/embed">віджет статусу тривоги</Link>{" "}
             для своєї області на власний сайт або стрім.
           </p>
           <p>
             Підтримати розвиток проєкту можна добровільним внеском:{" "}
             <a
-              className="text-rose-300 underline hover:text-rose-200"
+              className="text-alert underline hover:text-alert/80"
               href={SUPPORT_URL}
               target="_blank"
               rel="noopener noreferrer"

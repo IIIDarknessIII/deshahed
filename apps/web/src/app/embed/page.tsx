@@ -34,13 +34,13 @@ export default function EmbedDocsPage() {
   };
 
   return (
-    <main className="mx-auto min-h-dvh max-w-3xl space-y-6 px-4 py-8 pt-[max(2rem,var(--safe-top))] pb-[max(2rem,var(--safe-bottom))] text-zinc-100">
+    <main className="mx-auto min-h-dvh max-w-3xl space-y-6 px-4 py-8 pt-[max(2rem,var(--safe-top))] pb-[max(2rem,var(--safe-bottom))] text-fg">
       <header>
-        <Link href="/" className="text-xs text-zinc-500 hover:text-zinc-300">
+        <Link href="/" className="text-xs text-fg-subtle hover:text-fg-muted">
           ← На карту
         </Link>
         <h1 className="mt-2 text-2xl font-semibold">Вбудовуваний віджет</h1>
-        <p className="mt-1 text-sm text-zinc-400">
+        <p className="mt-1 text-sm text-fg-muted">
           Один рядок HTML — статус повітряної тривоги у вашій області, що оновлюється сам.
           Підходить для стрімів, особистих сайтів та внутрішніх дашбордів.
         </p>
@@ -48,7 +48,7 @@ export default function EmbedDocsPage() {
 
       <section className="grid gap-4 md:grid-cols-2">
         <div className="space-y-1.5">
-          <label className="text-xs uppercase tracking-wide text-zinc-500">Область</label>
+          <label className="text-xs uppercase tracking-wide text-fg-subtle">Область</label>
           <select
             value={slug}
             onChange={(e) => setSlug(e.target.value)}
@@ -60,7 +60,7 @@ export default function EmbedDocsPage() {
           </select>
         </div>
         <div className="space-y-1.5">
-          <label className="text-xs uppercase tracking-wide text-zinc-500">Розмір</label>
+          <label className="text-xs uppercase tracking-wide text-fg-subtle">Розмір</label>
           <select
             value={size.label}
             onChange={(e) => setSize(SIZES.find((s) => s.label === e.target.value) ?? SIZES[0])}
@@ -74,8 +74,8 @@ export default function EmbedDocsPage() {
       </section>
 
       <section className="space-y-2">
-        <div className="text-xs uppercase tracking-wide text-zinc-500">Прев'ю</div>
-        <div className="overflow-x-auto rounded-md border border-border bg-zinc-900 p-4">
+        <div className="text-xs uppercase tracking-wide text-fg-subtle">Прев'ю</div>
+        <div className="overflow-x-auto rounded-lg border border-border bg-surface p-4">
           <iframe
             key={url + size.label}
             src={url}
@@ -91,23 +91,23 @@ export default function EmbedDocsPage() {
 
       <section className="space-y-2">
         <div className="flex items-center justify-between">
-          <div className="text-xs uppercase tracking-wide text-zinc-500">HTML</div>
+          <div className="text-xs uppercase tracking-wide text-fg-subtle">HTML</div>
           <button
             type="button"
             onClick={copy}
-            className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-zinc-200 hover:border-zinc-600"
+            className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-fg hover:border-border-strong"
           >
             <Copy size={12} />
             {copied ? "Скопійовано" : "Скопіювати"}
           </button>
         </div>
-        <pre className="overflow-x-auto rounded-md border border-border bg-zinc-900 p-3 text-[12px] leading-relaxed text-zinc-200">
+        <pre className="overflow-x-auto rounded-lg border border-border bg-surface p-3 text-[12px] leading-relaxed text-fg">
           <code>{snippet}</code>
         </pre>
       </section>
 
-      <section className="rounded-md border border-border p-4 text-xs leading-relaxed text-zinc-400">
-        <p className="mb-1.5 font-semibold text-zinc-300">Як працює</p>
+      <section className="rounded-lg border border-border p-4 text-xs leading-relaxed text-fg-muted">
+        <p className="mb-1.5 font-semibold text-fg">Як працює</p>
         Віджет оновлює стан кожні 15 секунд напряму з нашого API. Колір тла, назва
         стану українською мовою та тривалість оновлюються автоматично. Клік на віджет
         веде на сторінку регіону.

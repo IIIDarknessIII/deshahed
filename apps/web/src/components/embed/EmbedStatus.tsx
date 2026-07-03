@@ -14,10 +14,10 @@ const SEV: Record<OblastAlertState, number> = {
 const ESC: ReadonlySet<OblastAlertState> = new Set(["air_raid", "artillery_shelling"]);
 
 const COLOR: Record<OblastAlertState, { bg: string; text: string; dot: string; border: string }> = {
-  safe:            { bg: "bg-zinc-900", text: "text-zinc-300", dot: "bg-zinc-600", border: "border-zinc-800" },
-  air_raid:        { bg: "bg-red-950",    text: "text-red-100",    dot: "bg-red-500",    border: "border-red-900" },
-  artillery_shelling: { bg: "bg-orange-950", text: "text-orange-100", dot: "bg-orange-500", border: "border-orange-900" },
-  urban_fights:    { bg: "bg-purple-950", text: "text-purple-100", dot: "bg-purple-500", border: "border-purple-900" },
+  safe:            { bg: "bg-surface",     text: "text-fg-muted",  dot: "bg-fg-faint",   border: "border-border" },
+  air_raid:        { bg: "bg-alert/10",     text: "text-alert",     dot: "bg-alert",      border: "border-alert/40" },
+  artillery_shelling: { bg: "bg-artillery/10", text: "text-artillery", dot: "bg-artillery", border: "border-artillery/40" },
+  urban_fights:    { bg: "bg-street/10",    text: "text-street",    dot: "bg-street",     border: "border-street/40" },
 };
 
 function classify(t: AlertType): OblastAlertState {
@@ -110,7 +110,7 @@ export function EmbedStatus({
       href={`https://xn----8sbkccc5iwa.online/region/${slug}`}
       target="_blank"
       rel="noopener noreferrer"
-      className={`flex h-full w-full flex-col items-stretch justify-between rounded-md border ${c.bg} ${c.border} px-3 py-2 text-left no-underline transition`}
+      className={`flex h-full w-full flex-col items-stretch justify-between rounded-lg border ${c.bg} ${c.border} px-3 py-2 text-left no-underline transition`}
       style={{ minHeight: 0 }}
     >
       <div className="flex items-center justify-between gap-2">
@@ -121,8 +121,8 @@ export function EmbedStatus({
       </div>
       <div className={`mt-1 truncate text-[14px] font-semibold ${c.text}`}>{label}</div>
       <div className="mt-0.5 flex items-center justify-between gap-2 text-[11px]">
-        <span className="truncate text-zinc-400 tabular-nums">{durationLabel(derived.since)}</span>
-        <span className="text-zinc-500">deshahed.online</span>
+        <span className="truncate text-fg-muted tabular-nums">{durationLabel(derived.since)}</span>
+        <span className="text-fg-subtle">deshahed.online</span>
       </div>
     </a>
   );

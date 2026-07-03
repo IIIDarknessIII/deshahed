@@ -82,15 +82,15 @@ export async function SubRegionPage({ sub }: { sub: SubRegion }) {
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
           <Link
             href="/"
-            className="inline-flex items-center gap-1 rounded p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+            className="inline-flex items-center gap-1 rounded p-1.5 text-fg-muted hover:bg-surface-2 hover:text-fg"
             aria-label="До карти"
           >
             <ArrowLeft size={18} />
           </Link>
           <div className="min-w-0">
-            <div className="truncate text-base font-semibold text-zinc-100">{sub.name_uk}</div>
+            <div className="truncate text-base font-semibold text-fg">{sub.name_uk}</div>
             {sub.oblast && (
-              <Link href={`/region/${sub.oblastSlug}`} className="text-xs text-zinc-500 hover:text-zinc-300">
+              <Link href={`/region/${sub.oblastSlug}`} className="text-xs text-fg-subtle hover:text-fg-muted">
                 {sub.oblast}
               </Link>
             )}
@@ -100,34 +100,34 @@ export async function SubRegionPage({ sub }: { sub: SubRegion }) {
 
       <div className="mx-auto max-w-3xl space-y-6 px-4 py-6 pb-[max(1.5rem,var(--safe-bottom))]">
         <section className="space-y-3">
-          <h1 className="text-xl font-semibold text-zinc-100">
+          <h1 className="text-xl font-semibold text-fg">
             Повітряна тривога — {sub.name_uk}
           </h1>
           <SubRegionStatus
             mkey={sub.mkey}
             initial={{ state: status.state, since: status.since }}
           />
-          <p className="text-sm leading-relaxed text-zinc-400">
-            <strong className="text-zinc-200">{ssrSentence}.</strong> Поточна ситуація з повітряними тривогами та загрозами для{" "}
+          <p className="text-sm leading-relaxed text-fg-muted">
+            <strong className="text-fg">{ssrSentence}.</strong> Поточна ситуація з повітряними тривогами та загрозами для{" "}
             {kind(sub.type)} «{sub.name_uk}»
             {sub.oblast && (
               <>
                 {" "}у складі{" "}
-                <Link className="underline hover:text-zinc-200" href={`/region/${sub.oblastSlug}`}>
+                <Link className="underline hover:text-fg" href={`/region/${sub.oblastSlug}`}>
                   {sub.oblast}
                 </Link>
               </>
             )}
             . Дані з відкритих джерел оновлюються в реальному часі. Дивіться загальну
             картину на{" "}
-            <Link className="underline hover:text-zinc-200" href="/">
+            <Link className="underline hover:text-fg" href="/">
               інтерактивній карті
             </Link>
             .
           </p>
           <Link
             href="/"
-            className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-zinc-300 transition hover:border-zinc-600"
+            className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-fg-muted transition hover:border-border-strong"
           >
             <MapIcon size={15} /> Відкрити карту
           </Link>
@@ -137,7 +137,7 @@ export async function SubRegionPage({ sub }: { sub: SubRegion }) {
           <RegionHistory regionUid={0} regionTitle={sub.oblast} oblastFullName={sub.oblast} />
         )}
 
-        <p className="text-[11px] leading-snug text-zinc-500">
+        <p className="text-[11px] leading-snug text-fg-subtle">
           Дані з відкритих джерел (OSINT) та alerts.in.ua. Не використовуйте для
           прийняття рішень про безпеку. Офіційне джерело — застосунок «Повітряна тривога».
         </p>

@@ -177,12 +177,12 @@ export function Timelapse() {
       <div className="relative min-h-0 flex-1">
         <div ref={containerRef} className="absolute inset-0" />
         <div className="pointer-events-none absolute left-3 top-[calc(var(--safe-top)+0.75rem)] rounded-md border border-border bg-bg/85 px-3 py-1.5 backdrop-blur">
-          <div className="text-[11px] uppercase tracking-wide text-zinc-500">Час</div>
-          <div className="font-mono text-base font-semibold text-zinc-100 tabular-nums">
+          <div className="text-[11px] uppercase tracking-wide text-fg-subtle">Час</div>
+          <div className="font-mono text-base font-semibold text-fg tabular-nums">
             {currentTime ? formatTime(currentTime) : "—"}
           </div>
-          <div className="text-[11px] text-zinc-400">
-            Активних областей: <span className="tabular-nums text-zinc-100">{activeCount}</span>
+          <div className="text-[11px] text-fg-muted">
+            Активних областей: <span className="font-mono tabular-nums text-fg">{activeCount}</span>
           </div>
         </div>
       </div>
@@ -192,7 +192,7 @@ export function Timelapse() {
           <button
             type="button"
             onClick={() => { setIdx(0); setPlaying(false); }}
-            className="rounded p-1.5 text-zinc-300 hover:bg-zinc-800"
+            className="rounded p-1.5 text-fg-muted hover:bg-surface-2"
             aria-label="На початок"
             title="На початок"
           >
@@ -205,13 +205,13 @@ export function Timelapse() {
               if (idx >= data.frames.length - 1) setIdx(0);
               setPlaying((p) => !p);
             }}
-            className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/60 bg-amber-500/10 px-3 py-1.5 text-sm text-amber-200 hover:bg-amber-500/20"
+            className="inline-flex items-center gap-1.5 rounded-md border border-warn/60 bg-warn/10 px-3 py-1.5 text-sm text-warn hover:bg-warn/20"
             disabled={!data}
           >
             {playing ? <Pause size={14} /> : <Play size={14} />}
             {playing ? "Пауза" : "Грати"}
           </button>
-          <div className="ml-2 flex items-center gap-1 text-xs text-zinc-400">
+          <div className="ml-2 flex items-center gap-1 text-xs text-fg-muted">
             <span>Швидкість:</span>
             {[1, 2, 4, 8].map((s) => (
               <button
@@ -221,15 +221,15 @@ export function Timelapse() {
                 className={
                   "rounded px-1.5 py-0.5 tabular-nums " +
                   (speed === s
-                    ? "bg-zinc-100 text-zinc-900"
-                    : "border border-border hover:border-zinc-600")
+                    ? "bg-fg text-bg"
+                    : "border border-border hover:border-border-strong")
                 }
               >
                 {s}×
               </button>
             ))}
           </div>
-          <div className="ml-auto text-xs text-zinc-500 tabular-nums">
+          <div className="ml-auto font-mono text-xs text-fg-subtle tabular-nums">
             {data ? `${idx + 1}/${data.frames.length}` : "—"}
           </div>
         </div>
@@ -240,17 +240,17 @@ export function Timelapse() {
           step={1}
           value={idx}
           onChange={(e) => { setIdx(Number(e.target.value)); setPlaying(false); }}
-          className="h-1.5 w-full cursor-pointer appearance-none rounded bg-zinc-800 accent-amber-500"
+          className="h-1.5 w-full cursor-pointer appearance-none rounded bg-surface-2 accent-warn"
           disabled={!data}
         />
-        <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-zinc-400">
+        <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-fg-muted">
           {Object.entries(STATE_LABEL_UK).map(([k, v]) => (
             <span key={k} className="inline-flex items-center gap-1.5">
               <span
                 className={
                   "inline-block h-2.5 w-2.5 rounded-sm " +
-                  (k === "air_raid" ? "bg-red-500/60" :
-                   k === "artillery_shelling" ? "bg-orange-500/60" : "bg-purple-500/70")
+                  (k === "air_raid" ? "bg-alert/60" :
+                   k === "artillery_shelling" ? "bg-artillery/60" : "bg-street/70")
                 }
               />
               {v}

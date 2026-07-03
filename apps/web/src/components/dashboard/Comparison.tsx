@@ -8,7 +8,7 @@ import { formatDuration } from "@/lib/format";
 function DeltaPill({ pct }: { pct: number | null }) {
   if (pct === null)
     return (
-      <span className="inline-flex items-center gap-1 text-xs text-zinc-500">
+      <span className="inline-flex items-center gap-1 text-xs text-fg-subtle">
         <Minus size={12} /> —
       </span>
     );
@@ -16,8 +16,8 @@ function DeltaPill({ pct }: { pct: number | null }) {
   return (
     <span
       className={
-        "inline-flex items-center gap-1 text-xs tabular-nums " +
-        (sign ? "text-rose-400" : "text-emerald-400")
+        "inline-flex items-center gap-1 text-xs font-mono tabular-nums " +
+        (sign ? "text-alert" : "text-safe")
       }
     >
       {sign ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
@@ -37,9 +37,9 @@ function Card({
   sub: React.ReactNode;
 }) {
   return (
-    <div className="rounded-md border border-border bg-bg/60 p-3">
-      <div className="text-[11px] uppercase tracking-wide text-zinc-500">{title}</div>
-      <div className="mt-1 text-2xl font-semibold tabular-nums text-zinc-100">{value}</div>
+    <div className="rounded-lg border border-border bg-bg/60 p-3">
+      <div className="text-[11px] uppercase tracking-wide text-fg-subtle">{title}</div>
+      <div className="mt-1 text-2xl font-semibold font-mono tabular-nums text-fg">{value}</div>
       <div className="mt-1">{sub}</div>
     </div>
   );
@@ -53,9 +53,9 @@ export function Comparison() {
   });
 
   if (isLoading)
-    return <div className="text-sm text-zinc-500">Завантаження…</div>;
+    return <div className="text-sm text-fg-subtle">Завантаження…</div>;
   if (isError)
-    return <div className="text-sm text-rose-400">Помилка завантаження</div>;
+    return <div className="text-sm text-alert">Помилка завантаження</div>;
 
   const c = data!;
   return (
@@ -64,7 +64,7 @@ export function Comparison() {
         title="Тривог сьогодні"
         value={String(c.today.total_alerts)}
         sub={
-          <span className="text-xs text-zinc-400">
+          <span className="text-xs text-fg-muted">
             вчора: {c.yesterday.total_alerts}{" "}
             <DeltaPill pct={c.alerts_delta_pct} />
           </span>
@@ -74,7 +74,7 @@ export function Comparison() {
         title="Час сьогодні"
         value={formatDuration(c.today.total_duration_minutes * 60_000)}
         sub={
-          <span className="text-xs text-zinc-400">
+          <span className="text-xs text-fg-muted">
             вчора: {formatDuration(c.yesterday.total_duration_minutes * 60_000)}{" "}
             <DeltaPill pct={c.duration_delta_pct} />
           </span>

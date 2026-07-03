@@ -20,9 +20,9 @@ export function DailyChart({ period }: { period: Period }) {
   });
 
   if (isLoading)
-    return <div className="text-sm text-zinc-500">Завантаження…</div>;
+    return <div className="text-sm text-fg-subtle">Завантаження…</div>;
   if (isError)
-    return <div className="text-sm text-rose-400">Помилка завантаження</div>;
+    return <div className="text-sm text-alert">Помилка завантаження</div>;
 
   const items = (data?.items ?? []).map((d) => ({
     label: d.date.slice(5),
@@ -32,7 +32,7 @@ export function DailyChart({ period }: { period: Period }) {
 
   if (items.length === 0)
     return (
-      <div className="flex h-64 items-center justify-center text-sm text-zinc-500">
+      <div className="flex h-64 items-center justify-center text-sm text-fg-subtle">
         Поки немає даних
       </div>
     );
@@ -41,12 +41,12 @@ export function DailyChart({ period }: { period: Period }) {
     <div className="h-64">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={items} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
-          <XAxis dataKey="label" tick={{ fill: "#9ca3af", fontSize: 11 }} axisLine={{ stroke: "#27272a" }} tickLine={false} />
-          <YAxis allowDecimals={false} tick={{ fill: "#9ca3af", fontSize: 11 }} axisLine={{ stroke: "#27272a" }} tickLine={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#262931" vertical={false} />
+          <XAxis dataKey="label" tick={{ fill: "#a1a1aa", fontSize: 11 }} axisLine={{ stroke: "#262931" }} tickLine={false} />
+          <YAxis allowDecimals={false} tick={{ fill: "#a1a1aa", fontSize: 11 }} axisLine={{ stroke: "#262931" }} tickLine={false} />
           <Tooltip
-            contentStyle={{ background: "#0a0a0b", border: "1px solid #27272a", borderRadius: 6, fontSize: 12 }}
-            labelStyle={{ color: "#9ca3af" }}
+            contentStyle={{ background: "#16191f", border: "1px solid #262931", borderRadius: 6, fontSize: 12 }}
+            labelStyle={{ color: "#a1a1aa" }}
             itemStyle={{ color: "#e5e7eb" }}
             formatter={(v: number, name) =>
               name === "count" ? [v, "Тривог"] : [`${v} хв`, "Час"]

@@ -26,14 +26,14 @@ export default function StatsPage() {
           <div className="flex items-center gap-3">
             <Link
               href="/"
-              className="inline-flex items-center gap-1 rounded p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+              className="inline-flex items-center gap-1 rounded p-1.5 text-fg-muted hover:bg-surface-2 hover:text-fg"
               aria-label="До карти"
             >
               <ArrowLeft size={18} />
             </Link>
             <div>
-              <div className="text-base font-semibold text-zinc-100">Статистика</div>
-              <div className="text-xs text-zinc-500">deshahed</div>
+              <div className="text-base font-semibold text-fg">Статистика</div>
+              <div className="text-xs text-fg-subtle">deshahed</div>
             </div>
           </div>
           <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -45,8 +45,8 @@ export default function StatsPage() {
                 className={
                   "shrink-0 rounded px-3 py-1.5 text-xs " +
                   (period === p.value
-                    ? "bg-zinc-100 text-zinc-900"
-                    : "border border-border text-zinc-300 hover:border-zinc-600")
+                    ? "bg-fg text-bg"
+                    : "border border-border text-fg-muted hover:border-border-strong")
                 }
               >
                 {p.label}
@@ -59,23 +59,23 @@ export default function StatsPage() {
       <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 pb-[max(1.5rem,var(--safe-bottom))]">
         <Comparison />
 
-        <section className="rounded-md border border-border p-4">
-          <h2 className="mb-2 text-sm font-semibold text-zinc-100">
+        <section className="rounded-lg border border-border p-4">
+          <h2 className="mb-2 text-sm font-semibold text-fg">
             Тривог по днях
           </h2>
           <DailyChart period={period} />
         </section>
 
         <div className="grid gap-6 lg:grid-cols-2">
-          <section className="rounded-md border border-border p-4">
-            <h2 className="mb-2 text-sm font-semibold text-zinc-100">
+          <section className="rounded-lg border border-border p-4">
+            <h2 className="mb-2 text-sm font-semibold text-fg">
               Топ-10 регіонів за тривалістю
             </h2>
             <TopRegions period={period} />
           </section>
 
-          <section className="rounded-md border border-border p-4">
-            <h2 className="mb-2 text-sm font-semibold text-zinc-100">
+          <section className="rounded-lg border border-border p-4">
+            <h2 className="mb-2 text-sm font-semibold text-fg">
               Розподіл тривалості тривог
             </h2>
             <DurationHistogram period={period} />

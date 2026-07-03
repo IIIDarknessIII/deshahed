@@ -36,23 +36,23 @@ export default function RegionsIndexPage() {
         <div className="mx-auto flex max-w-4xl items-center gap-3 px-4 py-3">
           <Link
             href="/"
-            className="inline-flex items-center gap-1 rounded p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+            className="inline-flex items-center gap-1 rounded p-1.5 text-fg-muted hover:bg-surface-2 hover:text-fg"
             aria-label="До карти"
           >
             <ArrowLeft size={18} />
           </Link>
           <div>
-            <div className="text-base font-semibold text-zinc-100">Регіони України</div>
-            <div className="text-xs text-zinc-500">повітряні тривоги по регіонах</div>
+            <div className="text-base font-semibold text-fg">Регіони України</div>
+            <div className="text-xs text-fg-subtle">повітряні тривоги по регіонах</div>
           </div>
         </div>
       </header>
 
       <div className="mx-auto max-w-4xl space-y-5 px-4 py-6 pb-[max(1.5rem,var(--safe-bottom))]">
-        <h1 className="text-xl font-semibold text-zinc-100">
+        <h1 className="text-xl font-semibold text-fg">
           Повітряні тривоги по регіонах України
         </h1>
-        <p className="text-sm text-zinc-400">
+        <p className="text-sm text-fg-muted">
           Оберіть область, район або громаду, щоб дивитися стан повітряної тривоги
           в реальному часі. Громади кожної області — на її сторінці.
         </p>
@@ -61,10 +61,10 @@ export default function RegionsIndexPage() {
           {REGIONS.map((region) => {
             const raions = raionsByOblast.get(region.slug) ?? [];
             return (
-              <section key={region.slug} className="rounded-md border border-border p-4">
+              <section key={region.slug} className="rounded-lg border border-border p-4">
                 <Link
                   href={`/region/${region.slug}`}
-                  className="text-sm font-semibold text-zinc-100 hover:underline"
+                  className="text-sm font-semibold text-fg hover:underline"
                 >
                   {region.full_name_uk}
                 </Link>
@@ -74,7 +74,7 @@ export default function RegionsIndexPage() {
                       <Link
                         key={s.slug}
                         href={`/raion/${s.slug}`}
-                        className="text-[13px] text-zinc-400 underline-offset-2 hover:text-zinc-100 hover:underline"
+                        className="text-[13px] text-fg-muted underline-offset-2 hover:text-fg hover:underline"
                       >
                         {s.name_uk}
                       </Link>

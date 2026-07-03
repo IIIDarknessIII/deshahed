@@ -25,16 +25,16 @@ export default function TimelapsePage() {
       <header className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3 pt-[max(0.75rem,var(--safe-top))]">
         <Link
           href="/"
-          className="inline-flex items-center gap-1 rounded p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+          className="inline-flex items-center gap-1 rounded p-1.5 text-fg-muted hover:bg-surface-2 hover:text-fg"
           aria-label="До карти"
         >
           <ArrowLeft size={18} />
         </Link>
         <div className="min-w-0">
-          <div className="truncate text-base font-semibold text-zinc-100">
+          <div className="truncate text-base font-semibold text-fg">
             Тайм-лапс тривог за 24 години
           </div>
-          <div className="text-xs text-zinc-500">
+          <div className="text-xs text-fg-subtle">
             Перемотайте ніч хвилину за хвилиною
           </div>
         </div>

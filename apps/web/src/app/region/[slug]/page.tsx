@@ -58,12 +58,12 @@ export default async function RegionPage({ params }: Props) {
   const ssrSentence = statusSentence(status);
   const statusCls =
     status.state === "safe"
-      ? "border-emerald-600/50 bg-emerald-600/10 text-emerald-300"
+      ? "border-safe/50 bg-safe/10 text-safe"
       : status.state === "artillery_shelling"
-        ? "border-orange-500/50 bg-orange-500/10 text-orange-300"
+        ? "border-artillery/50 bg-artillery/10 text-artillery"
         : status.state === "urban_fights"
-          ? "border-purple-500/50 bg-purple-500/10 text-purple-300"
-          : "border-red-500/50 bg-red-500/10 text-red-300";
+          ? "border-street/50 bg-street/10 text-street"
+          : "border-alert/50 bg-alert/10 text-alert";
 
   const faq = {
     "@context": "https://schema.org",
@@ -94,35 +94,35 @@ export default async function RegionPage({ params }: Props) {
         <div className="mx-auto flex max-w-4xl items-center gap-3 px-4 py-3">
           <Link
             href="/"
-            className="inline-flex items-center gap-1 rounded p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+            className="inline-flex items-center gap-1 rounded p-1.5 text-fg-muted hover:bg-surface-2 hover:text-fg"
             aria-label="До карти"
           >
             <ArrowLeft size={18} />
           </Link>
           <div>
-            <div className="text-base font-semibold text-zinc-100">{region.title}</div>
-            <div className="text-xs text-zinc-500">{region.full_name_uk}</div>
+            <div className="text-base font-semibold text-fg">{region.title}</div>
+            <div className="text-xs text-fg-subtle">{region.full_name_uk}</div>
           </div>
         </div>
       </header>
 
       <div className="mx-auto max-w-4xl space-y-6 px-4 py-6 pb-[max(1.5rem,var(--safe-bottom))]">
-        <section className="rounded-md border border-border p-4">
-          <h1 className="mb-3 text-xl font-semibold text-zinc-100">
+        <section className="rounded-lg border border-border p-4">
+          <h1 className="mb-3 text-xl font-semibold text-fg">
             Повітряна тривога — {region.full_name_uk}
           </h1>
           <div className={`mb-3 flex items-center gap-2 rounded-md border px-4 py-3 text-sm font-medium ${statusCls}`}>
             <span className="inline-flex h-2.5 w-2.5 animate-pulse rounded-full bg-current" />
             {ssrSentence}
           </div>
-          <p className="text-sm leading-relaxed text-zinc-400">
-            <strong className="text-zinc-200">{ssrSentence}</strong> на{" "}
+          <p className="text-sm leading-relaxed text-fg-muted">
+            <strong className="text-fg">{ssrSentence}</strong> на{" "}
             {region.full_name_uk}. Ця сторінка показує стан повітряної тривоги та
             загроз (БпЛА, ракети, артобстріл) у реальному часі за даними
             alerts.in.ua та OSINT-моніторингу. Нижче — історія тривог за останні
             періоди та перелік {raions.length} районів і {hromadas.length} громад
             області, кожен зі своєю сторінкою. Загальну картину по всій країні
-            дивіться на <Link className="underline hover:text-zinc-200" href="/">інтерактивній карті</Link>.
+            дивіться на <Link className="underline hover:text-fg" href="/">інтерактивній карті</Link>.
           </p>
         </section>
 
@@ -133,13 +133,13 @@ export default async function RegionPage({ params }: Props) {
         />
 
         {(raions.length > 0 || hromadas.length > 0) && (
-          <section className="rounded-md border border-border p-4">
-            <h2 className="mb-3 text-sm font-semibold text-zinc-100">
+          <section className="rounded-lg border border-border p-4">
+            <h2 className="mb-3 text-sm font-semibold text-fg">
               Райони та громади області
             </h2>
             {raions.length > 0 && (
               <>
-                <div className="mb-1.5 text-[11px] uppercase tracking-wide text-zinc-500">
+                <div className="mb-1.5 text-[11px] uppercase tracking-wide text-fg-subtle">
                   Райони
                 </div>
                 <div className="mb-3 flex flex-wrap gap-x-3 gap-y-1">
@@ -147,7 +147,7 @@ export default async function RegionPage({ params }: Props) {
                     <Link
                       key={s.slug}
                       href={`/raion/${s.slug}`}
-                      className="text-sm text-zinc-300 underline-offset-2 hover:text-zinc-100 hover:underline"
+                      className="text-sm text-fg-muted underline-offset-2 hover:text-fg hover:underline"
                     >
                       {s.name_uk}
                     </Link>
@@ -157,7 +157,7 @@ export default async function RegionPage({ params }: Props) {
             )}
             {hromadas.length > 0 && (
               <>
-                <div className="mb-1.5 text-[11px] uppercase tracking-wide text-zinc-500">
+                <div className="mb-1.5 text-[11px] uppercase tracking-wide text-fg-subtle">
                   Громади
                 </div>
                 <div className="flex flex-wrap gap-x-3 gap-y-1">
@@ -165,7 +165,7 @@ export default async function RegionPage({ params }: Props) {
                     <Link
                       key={s.slug}
                       href={`/hromada/${s.slug}`}
-                      className="text-sm text-zinc-400 underline-offset-2 hover:text-zinc-100 hover:underline"
+                      className="text-sm text-fg-muted underline-offset-2 hover:text-fg hover:underline"
                     >
                       {s.name_uk}
                     </Link>

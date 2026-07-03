@@ -71,9 +71,9 @@ export function RegionHistory({
   const totalMin = buckets.reduce((acc, b) => acc + b.durationMin, 0);
 
   return (
-    <section className="rounded-md border border-border p-4">
+    <section className="rounded-lg border border-border p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold text-zinc-100">
+        <h2 className="text-sm font-semibold text-fg">
           Історія тривог · {regionTitle}
         </h2>
         <div className="flex gap-1.5">
@@ -85,8 +85,8 @@ export function RegionHistory({
               className={
                 "rounded px-2.5 py-1 text-xs " +
                 (period === p.value
-                  ? "bg-zinc-100 text-zinc-900"
-                  : "border border-border text-zinc-300 hover:border-zinc-600")
+                  ? "bg-fg text-bg"
+                  : "border border-border text-fg-muted hover:border-border-strong")
               }
             >
               {p.label}
@@ -95,27 +95,27 @@ export function RegionHistory({
         </div>
       </div>
 
-      <div className="mb-3 flex gap-4 text-xs text-zinc-400 tabular-nums">
+      <div className="mb-3 flex gap-4 text-xs text-fg-muted tabular-nums">
         <span>Тривог: {total}</span>
         <span>Час: {formatDuration(totalMin * 60_000)}</span>
       </div>
 
       {isLoading && (
-        <div className="text-sm text-zinc-500">Завантаження…</div>
+        <div className="text-sm text-fg-subtle">Завантаження…</div>
       )}
       {isError && (
-        <div className="text-sm text-rose-400">Помилка завантаження</div>
+        <div className="text-sm text-alert">Помилка завантаження</div>
       )}
       {!isLoading && !isError && (
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={buckets} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
-              <XAxis dataKey="label" tick={{ fill: "#9ca3af", fontSize: 11 }} axisLine={{ stroke: "#27272a" }} tickLine={false} />
-              <YAxis allowDecimals={false} tick={{ fill: "#9ca3af", fontSize: 11 }} axisLine={{ stroke: "#27272a" }} tickLine={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#262931" vertical={false} />
+              <XAxis dataKey="label" tick={{ fill: "#a1a1aa", fontSize: 11 }} axisLine={{ stroke: "#262931" }} tickLine={false} />
+              <YAxis allowDecimals={false} tick={{ fill: "#a1a1aa", fontSize: 11 }} axisLine={{ stroke: "#262931" }} tickLine={false} />
               <Tooltip
-                contentStyle={{ background: "#0a0a0b", border: "1px solid #27272a", borderRadius: 6, fontSize: 12 }}
-                labelStyle={{ color: "#9ca3af" }}
+                contentStyle={{ background: "#16191f", border: "1px solid #262931", borderRadius: 6, fontSize: 12 }}
+                labelStyle={{ color: "#a1a1aa" }}
                 itemStyle={{ color: "#e5e7eb" }}
                 formatter={(v: number) => [v, "Тривог"]}
               />

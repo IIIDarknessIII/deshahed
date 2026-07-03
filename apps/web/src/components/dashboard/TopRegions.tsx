@@ -12,18 +12,18 @@ export function TopRegions({ period }: { period: Period }) {
   });
 
   if (isLoading)
-    return <div className="text-sm text-zinc-500">Завантаження…</div>;
+    return <div className="text-sm text-fg-subtle">Завантаження…</div>;
   if (isError)
-    return <div className="text-sm text-rose-400">Помилка завантаження</div>;
+    return <div className="text-sm text-alert">Помилка завантаження</div>;
 
   const top10 = (data?.by_oblast ?? []).slice(0, 10);
   if (top10.length === 0)
-    return <div className="text-sm text-zinc-500">Поки немає даних</div>;
+    return <div className="text-sm text-fg-subtle">Поки немає даних</div>;
 
   return (
     <table className="w-full text-sm">
       <thead>
-        <tr className="text-left text-[11px] uppercase tracking-wide text-zinc-500">
+        <tr className="text-left text-[11px] uppercase tracking-wide text-fg-subtle">
           <th className="py-1.5 pr-2 font-normal">#</th>
           <th className="py-1.5 pr-2 font-normal">Регіон</th>
           <th className="py-1.5 pr-2 text-right font-normal">Тривог</th>
@@ -33,10 +33,10 @@ export function TopRegions({ period }: { period: Period }) {
       <tbody>
         {top10.map((o, i) => (
           <tr key={o.location_uid} className="border-t border-border/60">
-            <td className="py-1.5 pr-2 text-zinc-500 tabular-nums">{i + 1}</td>
-            <td className="py-1.5 pr-2 truncate text-zinc-100">{o.location_title}</td>
-            <td className="py-1.5 pr-2 text-right text-zinc-300 tabular-nums">{o.count}</td>
-            <td className="py-1.5 text-right text-zinc-400 tabular-nums">
+            <td className="py-1.5 pr-2 text-fg-subtle font-mono tabular-nums">{i + 1}</td>
+            <td className="py-1.5 pr-2 truncate text-fg">{o.location_title}</td>
+            <td className="py-1.5 pr-2 text-right text-fg-muted font-mono tabular-nums">{o.count}</td>
+            <td className="py-1.5 text-right text-fg-muted font-mono tabular-nums">
               {formatDuration(o.duration_minutes * 60_000)}
             </td>
           </tr>
