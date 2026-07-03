@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { REGIONS } from "@/lib/regions";
+import { Hotspots } from "@/components/region/Hotspots";
 
 /**
  * Crawlable link footer for the home page. The map itself is a <canvas>, so
@@ -27,6 +28,8 @@ export function SeoFooter() {
             ))}
           </nav>
         </div>
+
+        <Hotspots limit={18} className="border-t border-border/60 pt-4" />
 
         <nav className="flex flex-wrap gap-x-4 gap-y-1.5 border-t border-border/60 pt-4">
           <Link href="/regions" className="hover:text-fg hover:underline">Усі регіони</Link>

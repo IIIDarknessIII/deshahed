@@ -3,8 +3,11 @@ import type { Metadata } from "next";
 import { ArrowLeft } from "lucide-react";
 import { REGIONS } from "@/lib/regions";
 import { RAIONS } from "@/lib/subregions_index";
+import { Hotspots } from "@/components/region/Hotspots";
 
 const SITE = "https://xn----8sbkccc5iwa.online";
+
+export const revalidate = 120;
 
 export const metadata: Metadata = {
   title: "Регіони України — карта повітряних тривог",
@@ -56,6 +59,8 @@ export default function RegionsIndexPage() {
           Оберіть область, район або громаду, щоб дивитися стан повітряної тривоги
           в реальному часі. Громади кожної області — на її сторінці.
         </p>
+
+        <Hotspots limit={40} className="rounded-lg border border-border p-4" />
 
         <div className="grid gap-4 sm:grid-cols-2">
           {REGIONS.map((region) => {

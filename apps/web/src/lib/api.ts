@@ -112,4 +112,21 @@ export const api = {
     ),
   heatmap: (period: Period, type: HeatmapType) =>
     get<HeatmapResponse>(`/api/v1/heatmap?period=${period}&type=${type}`),
+  statsTopSubregions: (period: Period, limit: number) =>
+    get<TopSubRegionsResponse>(
+      `/api/v1/stats/subregions/top?period=${period}&limit=${limit}`,
+    ),
 };
+
+export interface TopSubRegion {
+  location_title: string;
+  location_type: AlertView["location_type"];
+  location_oblast: string;
+  count: number;
+  duration_minutes: number;
+}
+
+export interface TopSubRegionsResponse {
+  period: Period;
+  items: TopSubRegion[];
+}

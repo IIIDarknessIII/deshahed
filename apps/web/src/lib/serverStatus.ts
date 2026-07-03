@@ -7,6 +7,7 @@
 // FAQ answers. This is the single biggest relevance win for "тривога X зараз".
 
 import { subKey } from "@/lib/subregions";
+import { findSubRegion } from "@/lib/subregionRelations";
 
 export type StatusState = "air_raid" | "artillery_shelling" | "urban_fights" | "safe";
 
@@ -134,6 +135,48 @@ export async function subRegionHistory(
     };
   } catch {
     return empty;
+  }
+}
+
+export interface Hotspot {
+  slug: string;
+  type: "raion" | "hromada";
+  name: string;
+  oblast: string;
+  count: number;
+}
+
+/**
+ * Most-active raions/hromadas (30 days), resolved to their landing pages.
+ * Rendered into high-authority hubs (home footer, /regions) so the SEO pages
+ * with real search demand get internal links + crawl priority.
+ */
+export async function topSubRegions(limit: number): Promise<Hotspot[]> {
+  try {
+    const res = await fetch(
+      `${API_INTERNAL}/api/v1/stats/subregions/top?period=month&limit=${limit}`,
+      { next: { revalidate: 120 } },
+    );
+    if (!res.ok) return [];
+    const data = (await res.json()) as {
+      items?: { location_title: string; location_oblast: string; count: number }[];
+    };
+    const out: Hotspot[] = [];
+    for (const it of data.items ?? []) {
+      const sub = findSubRegion(it.location_title, it.location_oblast);
+      if (sub) {
+        out.push({
+          slug: sub.slug,
+          type: sub.type,
+          name: sub.name_uk,
+          oblast: sub.oblast,
+          count: it.count,
+        });
+      }
+    }
+    return out;
+  } catch {
+    return [];
   }
 }
 

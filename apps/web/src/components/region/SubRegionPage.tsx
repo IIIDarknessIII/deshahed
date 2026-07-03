@@ -30,14 +30,18 @@ function kind(type: SubRegion["type"]): string {
 export async function subRegionMetadata(sub: SubRegion): Promise<Metadata> {
   const url = `${SITE}${basePath(sub.type)}/${sub.slug}`;
   const status = await subRegionStatus(sub.mkey);
+  const hist = sub.oblast
+    ? await subRegionHistory(sub.mkey, sub.oblast)
+    : { count: 0, totalMinutes: 0, lastStartedAt: null };
   // Lead the title with the live verdict so the SERP snippet answers the query.
   const verdict = status.state === "safe" ? "тривоги немає" : STATE_LABEL[status.state];
   const title = sub.oblast
     ? `${sub.name_uk}, ${sub.oblast} — ${verdict} (зараз)`
     : `${sub.name_uk} — ${verdict} (зараз)`;
+  const stat30 = hist.count > 0 ? ` За 30 днів зафіксовано ${hist.count} тривог.` : "";
   const description = `${statusSentence(status)} — ${kind(sub.type)} «${sub.name_uk}»${
     sub.oblast ? `, ${sub.oblast}` : ""
-  }. Стан повітряної тривоги в реальному часі, дані з відкритих джерел (OSINT).`;
+  }.${stat30} Стан повітряної тривоги в реальному часі, дані з відкритих джерел (OSINT).`;
   return {
     title,
     description,
