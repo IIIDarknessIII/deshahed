@@ -17,6 +17,7 @@ from sqlalchemy import func, select
 
 from app.db import get_session_factory
 from app.models import AlertEvent
+from app.subregion_key import subkey
 from app.schemas.alerts import (
     ActiveAlertsResponse,
     AlertView,
@@ -106,10 +107,16 @@ async def get_active_alerts_for_location(location_uid: int) -> ActiveAlertsRespo
 async def get_alerts_history(
     location_uid: int | None = Query(None, description="alerts.in.ua location_uid (precise sub-region)"),
     oblast: str | None = Query(None, description="Oblast full title — rolls up every sub-region inside it"),
+    subregion: str | None = Query(
+        None,
+        description="Normalized sub-region key (mkey) for a single raion/hromada. Requires `oblast` to narrow the scan.",
+    ),
     period: Period = Query("week"),
 ) -> HistoryResponse:
     if location_uid is None and not oblast:
-        raise HTTPException(status_code=400, detail="provide location_uid or oblast")
+        raise HTTPException(status_code=400, detail="provide location_uid, oblast or subregion")
+    if subregion is not None and not oblast:
+        raise HTTPException(status_code=400, detail="subregion requires oblast to narrow the query")
 
     start = _period_start(period)
     now = datetime.now(timezone.utc)
@@ -121,11 +128,18 @@ async def get_alerts_history(
             stmt = stmt.where(AlertEvent.location_oblast == oblast)
         if location_uid is not None:
             stmt = stmt.where(AlertEvent.location_uid == location_uid)
+        if subregion is not None:
+            # sub-region events only; the exact raion/hromada is matched below
+            # by the same normalized key the frontend/geometry use.
+            stmt = stmt.where(AlertEvent.location_type.in_(("raion", "hromada")))
         if start is not None:
             stmt = stmt.where(AlertEvent.started_at >= start)
         stmt = stmt.order_by(AlertEvent.started_at.desc())
         result = await session.execute(stmt)
         rows = result.scalars().all()
+
+    if subregion is not None:
+        rows = [r for r in rows if subkey(r.location_title) == subregion]
 
     items = [
         HistoryItem(
