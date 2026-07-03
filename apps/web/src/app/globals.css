@@ -4,16 +4,60 @@
 
 @import "maplibre-gl/dist/maplibre-gl.css";
 
+/* ------------------------------------------------------------------ */
+/*  Design tokens — space-separated RGB channels so Tailwind can apply */
+/*  `<alpha-value>` and hand-written CSS can reuse the exact same hue.  */
+/* ------------------------------------------------------------------ */
+:root {
+  /* Layered neutral-cool dark surfaces. */
+  --bg: 8 9 11; /* deepest — map letterbox */
+  --surface: 14 16 20; /* panels */
+  --surface-2: 22 25 31; /* raised cards, inputs */
+  --surface-3: 31 35 43; /* hover / active */
+
+  /* Hairlines. */
+  --border: 38 41 49;
+  --border-strong: 55 60 71;
+
+  /* Text ramp. */
+  --fg: 244 244 245;
+  --fg-muted: 161 161 170;
+  --fg-subtle: 138 139 149;
+  --fg-faint: 103 105 116;
+
+  /* Cool interactive accent ("night" signal). */
+  --accent: 96 165 250;
+
+  /* Alert-state semantics — kept identical to the on-map palette. */
+  --alert: 239 68 68;
+  --warn: 245 158 11;
+  --artillery: 249 115 22;
+  --street: 168 85 247;
+  --safe: 16 185 129;
+
+  /* Object-type accents. */
+  --shahed: 251 146 60;
+  --recon: 45 212 191;
+  --missile: 220 38 38;
+  --kab: 168 85 247;
+
+  /* Safe-area exposures for inline styles / arbitrary values. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 html,
 body {
   height: 100%;
   margin: 0;
   padding: 0;
-  background-color: #0a0a0b;
-  color: #e5e7eb;
+  background-color: rgb(var(--bg));
+  color: rgb(var(--fg));
   font-family:
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
     Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
   /* Stop iOS rubber-banding / pull-to-refresh from fighting the map. */
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
@@ -24,17 +68,47 @@ main {
   height: 100%;
 }
 
-/* Convenience env() exposures for use in inline styles / arbitrary values. */
-:root {
-  --safe-top: env(safe-area-inset-top, 0px);
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
+/* Selection picks up the cool accent instead of the browser default. */
+::selection {
+  background-color: rgb(var(--accent) / 0.28);
+  color: rgb(var(--fg));
 }
 
+/* ---- Global focus-visible: one consistent keyboard ring everywhere ---- */
+:focus-visible {
+  outline: 2px solid rgb(var(--accent) / 0.75);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
 .maplibregl-canvas:focus {
   outline: none;
 }
 
-/* Bottom-sheet entrance for the history dialog (and any modal reusing it). */
+/* ---- Thin, on-surface scrollbars ---- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--border-strong)) transparent;
+}
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: rgb(var(--border-strong));
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(var(--fg-faint));
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Motion — meaningful only; all suppressed under reduced-motion.     */
+/* ------------------------------------------------------------------ */
 @keyframes sheet-up {
   from {
     transform: translateY(12%);
@@ -45,24 +119,33 @@ main {
     opacity: 1;
   }
 }
-
 .animate-sheet-up {
-  animation: sheet-up 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: sheet-up 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-sheet-up {
-    animation: none;
+  .animate-sheet-up,
+  .animate-pulse-live,
+  .animate-pulse-ring,
+  .animate-fade-in {
+    animation: none !important;
+  }
+  * {
+    scroll-behavior: auto !important;
   }
 }
 
-/* ---- Dark theme for the built-in MapLibre controls ---- */
+/* ------------------------------------------------------------------ */
+/*  MapLibre chrome — themed to the new surface tokens.                */
+/* ------------------------------------------------------------------ */
 .maplibregl-ctrl-group {
-  background: rgba(24, 24, 27, 0.92);
-  border: 1px solid #27272a;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(6px);
+  background: rgb(var(--surface-2) / 0.92);
+  border: 1px solid rgb(var(--border));
+  border-radius: 10px;
+  box-shadow:
+    0 1px 0 0 rgb(255 255 255 / 0.04) inset,
+    0 8px 24px -10px rgb(0 0 0 / 0.7);
+  backdrop-filter: blur(8px);
   overflow: hidden;
 }
 
@@ -70,19 +153,20 @@ main {
   width: 34px;
   height: 34px;
   background-color: transparent;
+  transition: background-color 150ms ease;
 }
 
 .maplibregl-ctrl-group button + button {
-  border-top: 1px solid #27272a;
+  border-top: 1px solid rgb(var(--border));
 }
 
 .maplibregl-ctrl-group button:hover {
-  background-color: #27272a;
+  background-color: rgb(var(--surface-3));
 }
 
 /* Invert the default dark glyphs so they read on the dark control. */
 .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
-  filter: invert(0.85);
+  filter: invert(0.88);
 }
 
 .maplibregl-ctrl-attrib {
@@ -98,15 +182,17 @@ main {
 }
 
 .deshahed-popup .maplibregl-popup-content {
-  background: #0a0a0b;
-  color: #e5e7eb;
-  border: 1px solid #27272a;
-  border-radius: 6px;
+  background: rgb(var(--surface));
+  color: rgb(var(--fg));
+  border: 1px solid rgb(var(--border));
+  border-radius: 10px;
   padding: 0;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  box-shadow:
+    0 1px 0 0 rgb(255 255 255 / 0.04) inset,
+    0 10px 30px -8px rgb(0 0 0 / 0.6);
 }
 
 .deshahed-popup .maplibregl-popup-tip {
-  border-top-color: #27272a;
-  border-bottom-color: #27272a;
+  border-top-color: rgb(var(--border));
+  border-bottom-color: rgb(var(--border));
 }
