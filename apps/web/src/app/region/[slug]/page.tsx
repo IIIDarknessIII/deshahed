@@ -127,7 +127,6 @@ export default async function RegionPage({ params }: Props) {
         </section>
 
         <RegionHistory
-          regionUid={region.uid}
           regionTitle={region.title}
           oblastFullName={region.full_name_uk}
         />

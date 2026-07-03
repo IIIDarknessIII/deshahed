@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { useHistoryByOblast } from "@/hooks/useHistory";
+import { useHistoryByOblast, useSubRegionHistory } from "@/hooks/useHistory";
 import type { Period } from "@/lib/api";
 import { formatDuration } from "@/lib/format";
 
@@ -55,16 +55,21 @@ function bucketByDay(items: { started_at: string; duration_seconds: number }[], 
 }
 
 export function RegionHistory({
-  regionUid,
   regionTitle,
   oblastFullName,
+  subregionMkey,
 }: {
-  regionUid: number;
   regionTitle: string;
   oblastFullName: string;
+  /** When set, chart the single raion/hromada's own history, not the oblast. */
+  subregionMkey?: string;
 }) {
   const [period, setPeriod] = useState<Period>("week");
-  const { data, isLoading, isError } = useHistoryByOblast(oblastFullName, period);
+  // Both hooks run every render (stable order); only the relevant one is
+  // enabled so exactly one request fires.
+  const oblastQ = useHistoryByOblast(subregionMkey ? null : oblastFullName, period);
+  const subQ = useSubRegionHistory(subregionMkey ?? null, oblastFullName, period);
+  const { data, isLoading, isError } = subregionMkey ? subQ : oblastQ;
 
   const buckets = data ? bucketByDay(data.items, period) : [];
   const total = data?.items.length ?? 0;

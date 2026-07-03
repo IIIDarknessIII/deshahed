@@ -18,3 +18,16 @@ export function useHistoryByOblast(oblast: string | null, period: Period) {
     staleTime: 30_000,
   });
 }
+
+export function useSubRegionHistory(
+  mkey: string | null,
+  oblast: string | null,
+  period: Period,
+) {
+  return useQuery({
+    queryKey: ["alerts", "history-subregion", mkey, oblast, period],
+    queryFn: () => api.alertsHistoryBySubregion(mkey!, oblast!, period),
+    enabled: !!mkey && !!oblast,
+    staleTime: 30_000,
+  });
+}

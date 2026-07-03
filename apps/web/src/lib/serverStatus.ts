@@ -91,6 +91,52 @@ export async function subRegionStatus(mkey: string): Promise<RegionStatus> {
   return { state: best, since };
 }
 
+export interface SubRegionHistorySummary {
+  /** Alerts in the last 30 days. */
+  count: number;
+  /** Total alert duration over the window, in minutes. */
+  totalMinutes: number;
+  /** ISO start of the most recent alert, or null if none in the window. */
+  lastStartedAt: string | null;
+}
+
+interface HistoryItemLite {
+  started_at: string;
+  duration_seconds: number;
+}
+
+/**
+ * Real 30-day alert stats for a single raion/hromada, baked into the SEO page
+ * server-side. This is what makes each of the ~1500 sub-region pages carry
+ * genuinely unique content instead of the parent oblast's shared numbers.
+ */
+export async function subRegionHistory(
+  mkey: string,
+  oblast: string,
+): Promise<SubRegionHistorySummary> {
+  const empty: SubRegionHistorySummary = { count: 0, totalMinutes: 0, lastStartedAt: null };
+  if (!oblast) return empty;
+  try {
+    const url = `${API_INTERNAL}/api/v1/alerts/history?subregion=${encodeURIComponent(
+      mkey,
+    )}&oblast=${encodeURIComponent(oblast)}&period=month`;
+    const res = await fetch(url, { next: { revalidate: 600 } });
+    if (!res.ok) return empty;
+    const data = (await res.json()) as { items?: HistoryItemLite[] };
+    const items = data.items ?? [];
+    if (items.length === 0) return empty;
+    const totalSec = items.reduce((acc, it) => acc + (it.duration_seconds || 0), 0);
+    // Backend returns items ordered by started_at desc, so [0] is the latest.
+    return {
+      count: items.length,
+      totalMinutes: Math.round(totalSec / 60),
+      lastStartedAt: items[0].started_at,
+    };
+  } catch {
+    return empty;
+  }
+}
+
 export const STATE_LABEL: Record<StatusState, string> = {
   air_raid: "Повітряна тривога",
   artillery_shelling: "Загроза артобстрілу",

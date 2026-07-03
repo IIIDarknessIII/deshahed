@@ -4,7 +4,13 @@ import { ArrowLeft, Map as MapIcon } from "lucide-react";
 import type { SubRegion } from "@/lib/subregions_index";
 import { SubRegionStatus } from "@/components/region/SubRegionStatus";
 import { RegionHistory } from "@/components/region/RegionHistory";
-import { subRegionStatus, statusSentence, STATE_LABEL } from "@/lib/serverStatus";
+import {
+  subRegionStatus,
+  subRegionHistory,
+  statusSentence,
+  STATE_LABEL,
+} from "@/lib/serverStatus";
+import { formatDuration } from "@/lib/format";
 import { siblingsInOblast, oblastChildCounts } from "@/lib/subregionRelations";
 
 // How many sibling links to inline per page — enough for real crawl paths and
@@ -60,6 +66,15 @@ export async function SubRegionPage({ sub }: { sub: SubRegion }) {
   const siblingRaions = siblings.filter((s) => s.type === "raion").slice(0, MAX_SIBLINGS);
   const siblingHromadas = siblings.filter((s) => s.type === "hromada").slice(0, MAX_SIBLINGS);
 
+  // Real per-sub-region 30-day stats — the unique-content lever.
+  const hist = sub.oblast
+    ? await subRegionHistory(sub.mkey, sub.oblast)
+    : { count: 0, totalMinutes: 0, lastStartedAt: null };
+  const lastAgo =
+    hist.lastStartedAt !== null
+      ? formatDuration(Date.now() - +new Date(hist.lastStartedAt))
+      : null;
+
   const breadcrumb = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
@@ -81,7 +96,11 @@ export async function SubRegionPage({ sub }: { sub: SubRegion }) {
         name: `Чи є зараз повітряна тривога в «${sub.name_uk}»?`,
         acceptedAnswer: {
           "@type": "Answer",
-          text: `${ssrSentence}. Актуальний стан тривоги для ${kind(
+          text: `${ssrSentence}.${
+            hist.count > 0
+              ? ` За останні 30 днів для ${kind(sub.type)} «${sub.name_uk}» зафіксовано ${hist.count} тривог загальною тривалістю ${formatDuration(hist.totalMinutes * 60_000)}.`
+              : ""
+          } Актуальний стан тривоги для ${kind(
             sub.type,
           )} «${sub.name_uk}» оновлюється в реальному часі на цій сторінці та на інтерактивній карті deshahed. Джерело — alerts.in.ua та OSINT-моніторинг.`,
         },
@@ -156,8 +175,46 @@ export async function SubRegionPage({ sub }: { sub: SubRegion }) {
           </Link>
         </section>
 
+        {hist.count > 0 && (
+          <section className="rounded-lg border border-border p-4">
+            <h2 className="mb-3 text-sm font-semibold text-fg">
+              Статистика тривог за 30 днів — {sub.name_uk}
+            </h2>
+            <div className="grid grid-cols-3 gap-2.5">
+              <div className="rounded-lg border border-border bg-surface-2/60 px-3 py-2.5">
+                <div className="text-[11px] font-medium uppercase tracking-wider text-fg-subtle">
+                  Тривог
+                </div>
+                <div className="mt-1 font-mono text-xl font-semibold tabular-nums text-fg">
+                  {hist.count}
+                </div>
+              </div>
+              <div className="rounded-lg border border-border bg-surface-2/60 px-3 py-2.5">
+                <div className="text-[11px] font-medium uppercase tracking-wider text-fg-subtle">
+                  Сумарний час
+                </div>
+                <div className="mt-1 font-mono text-xl font-semibold tabular-nums text-fg">
+                  {formatDuration(hist.totalMinutes * 60_000)}
+                </div>
+              </div>
+              <div className="rounded-lg border border-border bg-surface-2/60 px-3 py-2.5">
+                <div className="text-[11px] font-medium uppercase tracking-wider text-fg-subtle">
+                  Остання
+                </div>
+                <div className="mt-1 font-mono text-sm font-semibold tabular-nums text-fg">
+                  {lastAgo ? `${lastAgo} тому` : "—"}
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
         {sub.oblast && (
-          <RegionHistory regionUid={0} regionTitle={sub.oblast} oblastFullName={sub.oblast} />
+          <RegionHistory
+            regionTitle={sub.name_uk}
+            oblastFullName={sub.oblast}
+            subregionMkey={sub.mkey}
+          />
         )}
 
         {(siblingRaions.length > 0 || siblingHromadas.length > 0) && (

@@ -106,6 +106,10 @@ export const api = {
     get<HistoryResponse>(
       `/api/v1/alerts/history?oblast=${encodeURIComponent(oblast)}&period=${period}`,
     ),
+  alertsHistoryBySubregion: (mkey: string, oblast: string, period: Period) =>
+    get<HistoryResponse>(
+      `/api/v1/alerts/history?subregion=${encodeURIComponent(mkey)}&oblast=${encodeURIComponent(oblast)}&period=${period}`,
+    ),
   heatmap: (period: Period, type: HeatmapType) =>
     get<HeatmapResponse>(`/api/v1/heatmap?period=${period}&type=${type}`),
 };
