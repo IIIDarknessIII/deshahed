@@ -5,6 +5,11 @@ import type { SubRegion } from "@/lib/subregions_index";
 import { SubRegionStatus } from "@/components/region/SubRegionStatus";
 import { RegionHistory } from "@/components/region/RegionHistory";
 import { subRegionStatus, statusSentence, STATE_LABEL } from "@/lib/serverStatus";
+import { siblingsInOblast, oblastChildCounts } from "@/lib/subregionRelations";
+
+// How many sibling links to inline per page — enough for real crawl paths and
+// unique-per-page content without turning each page into a link farm.
+const MAX_SIBLINGS = 30;
 
 const SITE = "https://xn----8sbkccc5iwa.online";
 
@@ -21,7 +26,9 @@ export async function subRegionMetadata(sub: SubRegion): Promise<Metadata> {
   const status = await subRegionStatus(sub.mkey);
   // Lead the title with the live verdict so the SERP snippet answers the query.
   const verdict = status.state === "safe" ? "тривоги немає" : STATE_LABEL[status.state];
-  const title = `${sub.name_uk} — ${verdict} (зараз)`;
+  const title = sub.oblast
+    ? `${sub.name_uk}, ${sub.oblast} — ${verdict} (зараз)`
+    : `${sub.name_uk} — ${verdict} (зараз)`;
   const description = `${statusSentence(status)} — ${kind(sub.type)} «${sub.name_uk}»${
     sub.oblast ? `, ${sub.oblast}` : ""
   }. Стан повітряної тривоги в реальному часі, дані з відкритих джерел (OSINT).`;
@@ -46,6 +53,12 @@ export async function SubRegionPage({ sub }: { sub: SubRegion }) {
   const url = `${SITE}${basePath(sub.type)}/${sub.slug}`;
   const status = await subRegionStatus(sub.mkey);
   const ssrSentence = statusSentence(status);
+
+  // Unique-per-page context: real oblast counts + lateral sibling links.
+  const siblings = siblingsInOblast(sub);
+  const counts = sub.oblastSlug ? oblastChildCounts(sub.oblastSlug) : { raions: 0, hromadas: 0 };
+  const siblingRaions = siblings.filter((s) => s.type === "raion").slice(0, MAX_SIBLINGS);
+  const siblingHromadas = siblings.filter((s) => s.type === "hromada").slice(0, MAX_SIBLINGS);
 
   const breadcrumb = {
     "@context": "https://schema.org",
@@ -125,6 +138,16 @@ export async function SubRegionPage({ sub }: { sub: SubRegion }) {
             </Link>
             .
           </p>
+          {sub.oblast && counts.raions + counts.hromadas > 0 && (
+            <p className="text-sm leading-relaxed text-fg-muted">
+              «{sub.name_uk}» — {sub.type === "raion" ? "район" : "громада"} у складі{" "}
+              <Link className="underline hover:text-fg" href={`/region/${sub.oblastSlug}`}>
+                {sub.oblast}
+              </Link>
+              , де deshahed відстежує {counts.raions} районів та {counts.hromadas} громад,
+              кожен зі своєю сторінкою стану тривоги.
+            </p>
+          )}
           <Link
             href="/"
             className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-fg-muted transition hover:border-border-strong"
@@ -135,6 +158,58 @@ export async function SubRegionPage({ sub }: { sub: SubRegion }) {
 
         {sub.oblast && (
           <RegionHistory regionUid={0} regionTitle={sub.oblast} oblastFullName={sub.oblast} />
+        )}
+
+        {(siblingRaions.length > 0 || siblingHromadas.length > 0) && (
+          <section className="rounded-lg border border-border p-4">
+            <h2 className="mb-3 text-sm font-semibold text-fg">
+              Сусідні райони та громади{sub.oblast ? ` — ${sub.oblast}` : ""}
+            </h2>
+            {siblingRaions.length > 0 && (
+              <>
+                <div className="mb-1.5 text-[11px] uppercase tracking-wide text-fg-subtle">
+                  Райони
+                </div>
+                <div className="mb-3 flex flex-wrap gap-x-3 gap-y-1">
+                  {siblingRaions.map((s) => (
+                    <Link
+                      key={`r-${s.slug}`}
+                      href={`/raion/${s.slug}`}
+                      className="text-sm text-fg-muted underline-offset-2 hover:text-fg hover:underline"
+                    >
+                      {s.name_uk}
+                    </Link>
+                  ))}
+                </div>
+              </>
+            )}
+            {siblingHromadas.length > 0 && (
+              <>
+                <div className="mb-1.5 text-[11px] uppercase tracking-wide text-fg-subtle">
+                  Громади
+                </div>
+                <div className="flex flex-wrap gap-x-3 gap-y-1">
+                  {siblingHromadas.map((s) => (
+                    <Link
+                      key={`h-${s.slug}`}
+                      href={`/hromada/${s.slug}`}
+                      className="text-sm text-fg-muted underline-offset-2 hover:text-fg hover:underline"
+                    >
+                      {s.name_uk}
+                    </Link>
+                  ))}
+                </div>
+              </>
+            )}
+            {sub.oblastSlug && (
+              <Link
+                href={`/region/${sub.oblastSlug}`}
+                className="mt-3 inline-block text-sm text-accent underline-offset-2 hover:underline"
+              >
+                Усі райони та громади — {sub.oblast} →
+              </Link>
+            )}
+          </section>
         )}
 
         <p className="text-[11px] leading-snug text-fg-subtle">
