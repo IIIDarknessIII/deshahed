@@ -7,6 +7,8 @@ import { useDronesStore } from "@/stores/dronesStore";
 import { objectInfo, typicalSpeed, typicalAltitude, compass } from "@/lib/objectInfo";
 import { ObjectIllustration } from "@/components/ObjectIllustration";
 import { formatDuration } from "@/lib/format";
+import { Modal } from "@/components/ui/Modal";
+import { IconButton } from "@/components/ui/IconButton";
 
 function bearingDeg(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const toRad = (d: number) => (d * Math.PI) / 180;
@@ -18,9 +20,9 @@ function bearingDeg(lat1: number, lon1: number, lat2: number, lon2: number): num
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 border-b border-border/50 py-2">
-      <span className="text-[12px] text-zinc-500">{label}</span>
-      <span className="text-right text-sm text-zinc-100">{value}</span>
+    <div className="flex items-baseline justify-between gap-3 border-b border-border/50 py-2 last:border-b-0">
+      <span className="text-[12px] text-fg-subtle">{label}</span>
+      <span className="text-right text-sm text-fg">{value}</span>
     </div>
   );
 }
@@ -37,11 +39,11 @@ export function DroneDetailModal() {
   // Drone may have expired/evicted while the modal was open.
   if (!drone) {
     return (
-      <Overlay onClose={() => selectDrone(null)}>
-        <div className="p-6 text-sm text-zinc-400">
+      <Modal onClose={() => selectDrone(null)}>
+        <div className="p-6 text-sm text-fg-muted">
           Об&apos;єкт більше не відстежується (мітка зникла).
         </div>
-      </Overlay>
+      </Modal>
     );
   }
 
@@ -55,25 +57,26 @@ export function DroneDetailModal() {
   const confLabel = { high: "висока", medium: "середня", low: "низька" }[drone.confidence] ?? drone.confidence;
 
   return (
-    <Overlay onClose={() => selectDrone(null)}>
-      <header className="flex items-start justify-between gap-3 border-b border-border px-5 py-3">
-        <div>
-          <div className="text-base font-semibold" style={{ color: info.accent }}>
-            {info.label}
+    <Modal onClose={() => selectDrone(null)} contentClassName="overflow-y-auto">
+      <header className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-5 py-3">
+        <div className="flex items-center gap-2.5">
+          <span
+            className="h-8 w-1 shrink-0 rounded-full"
+            style={{ backgroundColor: info.accent }}
+          />
+          <div>
+            <div className="text-base font-semibold" style={{ color: info.accent }}>
+              {info.label}
+            </div>
+            <div className="text-xs text-fg-subtle">{info.fullName}</div>
           </div>
-          <div className="text-xs text-zinc-500">{info.fullName}</div>
         </div>
-        <button
-          type="button"
-          onClick={() => selectDrone(null)}
-          className="-mr-1 flex h-9 w-9 items-center justify-center rounded text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
-          aria-label="Закрити"
-        >
+        <IconButton label="Закрити" onClick={() => selectDrone(null)} className="-mr-1">
           <X size={20} />
-        </button>
+        </IconButton>
       </header>
 
-      <div className="h-32 w-full shrink-0 border-b border-border">
+      <div className="h-32 w-full shrink-0 border-b border-border bg-surface-2/40">
         <ObjectIllustration type={drone.event_type} />
       </div>
 
@@ -82,48 +85,27 @@ export function DroneDetailModal() {
           label="Напрямок руху"
           value={
             c
-              ? <>{c.name} <span className="text-zinc-400">({c.abbr}, {Math.round(bearing as number)}°)</span></>
-              : <span className="text-zinc-500">невідомо</span>
+              ? <>{c.name} <span className="font-mono text-fg-muted">({c.abbr}, {Math.round(bearing as number)}°)</span></>
+              : <span className="text-fg-subtle">невідомо</span>
           }
         />
-        <Row label="Швидкість" value={<>{typicalSpeed(info)} <span className="text-zinc-500 text-xs">типова</span></>} />
-        <Row label="Висота" value={<>{typicalAltitude(info)} <span className="text-zinc-500 text-xs">типова</span></>} />
+        <Row label="Швидкість" value={<>{typicalSpeed(info)} <span className="text-fg-subtle text-xs">типова</span></>} />
+        <Row label="Висота" value={<>{typicalAltitude(info)} <span className="text-fg-subtle text-xs">типова</span></>} />
         <Row label="Місце" value={drone.location_text || "—"} />
         {drone.direction_text && <Row label="У напрямку" value={drone.direction_text} />}
         <Row label="Виявлено" value={`${formatDuration(ageMs)} тому`} />
         <Row label="Достовірність" value={confLabel} />
       </div>
 
-      <p className="px-5 pb-4 pt-1 text-sm leading-relaxed text-zinc-400">
+      <p className="px-5 pb-4 pt-1 text-sm leading-relaxed text-fg-muted">
         {info.description}
       </p>
 
-      <p className="border-t border-border px-5 py-3 text-[11px] leading-snug text-zinc-500">
+      <p className="border-t border-border px-5 py-3 text-[11px] leading-snug text-fg-faint">
         Швидкість і висота — типові характеристики цього типу цілі, а не виміряні
         дані конкретного об&apos;єкта. Джерело — OSINT-моніторинг (@{drone.source_channel}).
         Не використовуйте для прийняття рішень про безпеку.
       </p>
-    </Overlay>
-  );
-}
-
-function Overlay({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-[2px] md:items-center md:p-4"
-      onClick={onClose}
-    >
-      <div
-        className="animate-sheet-up flex max-h-[88dvh] w-full max-w-md flex-col overflow-y-auto overflow-x-hidden rounded-t-2xl border border-border bg-bg shadow-2xl md:rounded-lg"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="shrink-0 pb-1 pt-2.5 md:hidden">
-          <div className="mx-auto h-1.5 w-10 rounded-full bg-zinc-700" />
-        </div>
-        {children}
-      </div>
-    </div>
+    </Modal>
   );
 }

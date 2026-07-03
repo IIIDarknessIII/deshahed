@@ -16,6 +16,19 @@ import { useUiStore } from "@/stores/uiStore";
 import { TITLE_BY_UID } from "@/lib/locations";
 import { type HistoryItem, type Period } from "@/lib/api";
 import { formatDuration } from "@/lib/format";
+import { Modal } from "@/components/ui/Modal";
+import { Segmented } from "@/components/ui/Segmented";
+import { IconButton } from "@/components/ui/IconButton";
+
+// Chart colours mirror the design tokens (recharts needs literal values).
+const CHART = {
+  grid: "#262931",
+  axis: "#a1a1aa",
+  tooltipBg: "#16191f",
+  tooltipLabel: "#a1a1aa",
+  tooltipItem: "#f4f4f5",
+  bar: "#ef4444",
+} as const;
 
 const PERIODS: { value: Period; label: string }[] = [
   { value: "day", label: "Доба" },
@@ -80,86 +93,56 @@ export function HistoryModal() {
   const totalDurationMin = buckets.reduce((acc, b) => acc + b.durationMin, 0);
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-[2px] md:items-center md:p-4"
-      onClick={() => selectLocation(null)}
-    >
-      <div
-        className="animate-sheet-up flex max-h-[88dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-border bg-bg shadow-2xl md:max-h-none md:rounded-lg"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Grab-handle affordance on mobile. */}
-        <div className="shrink-0 pb-1 pt-2.5 md:hidden">
-          <div className="mx-auto h-1.5 w-10 rounded-full bg-zinc-700" />
+    <Modal onClose={() => selectLocation(null)} size="lg" contentClassName="md:max-h-none">
+      <header className="flex shrink-0 items-center justify-between border-b border-border px-5 py-3">
+        <div>
+          <div className="text-base font-semibold tracking-tight text-fg">{title}</div>
+          <div className="text-xs text-fg-subtle">Історія тривог</div>
         </div>
-        <header className="flex shrink-0 items-center justify-between border-b border-border px-5 py-3">
-          <div>
-            <div className="text-base font-semibold text-zinc-100">{title}</div>
-            <div className="text-xs text-zinc-500">Історія тривог</div>
-          </div>
-          <button
-            type="button"
-            onClick={() => selectLocation(null)}
-            className="-mr-1 flex h-9 w-9 items-center justify-center rounded text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
-            aria-label="Закрити"
-          >
-            <X size={20} />
-          </button>
-        </header>
+        <IconButton label="Закрити" onClick={() => selectLocation(null)} className="-mr-1">
+          <X size={20} />
+        </IconButton>
+      </header>
 
-        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-5 py-2.5">
-          {PERIODS.map((p) => (
-            <button
-              key={p.value}
-              type="button"
-              onClick={() => setPeriod(p.value)}
-              className={
-                "rounded px-3 py-1.5 text-xs " +
-                (period === p.value
-                  ? "bg-zinc-100 text-zinc-900"
-                  : "border border-border text-zinc-300 hover:border-zinc-600")
-              }
-            >
-              {p.label}
-            </button>
-          ))}
-          <div className="ml-auto flex gap-4 text-xs text-zinc-400 tabular-nums">
-            <span>Тривог: {totalItems}</span>
-            <span>Час: {formatDuration(totalDurationMin * 60_000)}</span>
-          </div>
+      <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-border px-5 py-2.5">
+        <div className="w-52">
+          <Segmented options={PERIODS} value={period} onChange={setPeriod} ariaLabel="Період історії" />
         </div>
-
-        <div className="h-64 shrink-0 px-3 py-3 pb-[max(0.75rem,var(--safe-bottom))]">
-          {isLoading && (
-            <div className="flex h-full items-center justify-center text-sm text-zinc-500">
-              Завантаження…
-            </div>
-          )}
-          {isError && (
-            <div className="flex h-full items-center justify-center text-sm text-rose-400">
-              Помилка завантаження
-            </div>
-          )}
-          {!isLoading && !isError && (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={buckets} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
-                <XAxis dataKey="label" tick={{ fill: "#9ca3af", fontSize: 11 }} axisLine={{ stroke: "#27272a" }} tickLine={false} />
-                <YAxis allowDecimals={false} tick={{ fill: "#9ca3af", fontSize: 11 }} axisLine={{ stroke: "#27272a" }} tickLine={false} />
-                <Tooltip
-                  contentStyle={{ background: "#0a0a0b", border: "1px solid #27272a", borderRadius: 6, fontSize: 12 }}
-                  labelStyle={{ color: "#9ca3af" }}
-                  itemStyle={{ color: "#e5e7eb" }}
-                  formatter={(v: number, name) => (name === "durationMin" ? [`${v} хв`, "Час"] : [v, "Тривог"])}
-                />
-                <Bar dataKey="count" fill="#ef4444" radius={[3, 3, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
+        <div className="ml-auto flex gap-4 font-mono text-xs tabular-nums text-fg-muted">
+          <span>Тривог: <span className="text-fg">{totalItems}</span></span>
+          <span>Час: <span className="text-fg">{formatDuration(totalDurationMin * 60_000)}</span></span>
         </div>
       </div>
-    </div>
+
+      <div className="h-64 shrink-0 px-3 py-3 pb-[max(0.75rem,var(--safe-bottom))]">
+        {isLoading && (
+          <div className="flex h-full items-center justify-center text-sm text-fg-subtle">
+            Завантаження…
+          </div>
+        )}
+        {isError && (
+          <div className="flex h-full items-center justify-center text-sm text-alert">
+            Помилка завантаження
+          </div>
+        )}
+        {!isLoading && !isError && (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={buckets} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} vertical={false} />
+              <XAxis dataKey="label" tick={{ fill: CHART.axis, fontSize: 11 }} axisLine={{ stroke: CHART.grid }} tickLine={false} />
+              <YAxis allowDecimals={false} tick={{ fill: CHART.axis, fontSize: 11 }} axisLine={{ stroke: CHART.grid }} tickLine={false} />
+              <Tooltip
+                cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                contentStyle={{ background: CHART.tooltipBg, border: `1px solid ${CHART.grid}`, borderRadius: 10, fontSize: 12 }}
+                labelStyle={{ color: CHART.tooltipLabel }}
+                itemStyle={{ color: CHART.tooltipItem }}
+                formatter={(v: number, name) => (name === "durationMin" ? [`${v} хв`, "Час"] : [v, "Тривог"])}
+              />
+              <Bar dataKey="count" fill={CHART.bar} radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+    </Modal>
   );
 }
