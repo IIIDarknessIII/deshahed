@@ -29,6 +29,8 @@ from app.schemas.alerts import (
     DurationHistogramResponse,
     HistoryItem,
     HistoryResponse,
+    TopSubRegion,
+    TopSubRegionsResponse,
     OblastStat,
     SummaryResponse,
     TimelapseFrame,
@@ -159,6 +161,56 @@ async def get_alerts_history(
         period=period,
         items=items,
     )
+
+
+@router.get("/stats/subregions/top", response_model=TopSubRegionsResponse)
+async def get_top_subregions(
+    period: Period = Query("month"),
+    limit: int = Query(24, ge=1, le=100),
+) -> TopSubRegionsResponse:
+    """Most-active raions/hromadas over the window — powers the 'hotspots'
+    internal-link hubs that surface the SEO pages with real search demand."""
+    start = _period_start(period)
+    duration_expr = func.extract(
+        "epoch",
+        func.coalesce(AlertEvent.finished_at, func.now()) - AlertEvent.started_at,
+    )
+    factory = get_session_factory()
+    async with factory() as session:
+        stmt = (
+            select(
+                AlertEvent.location_title.label("title"),
+                AlertEvent.location_type.label("ltype"),
+                AlertEvent.location_oblast.label("oblast"),
+                func.count().label("cnt"),
+                func.coalesce(func.sum(duration_expr), 0).label("dur"),
+            )
+            .where(AlertEvent.location_type.in_(("raion", "hromada")))
+        )
+        if start is not None:
+            stmt = stmt.where(AlertEvent.started_at >= start)
+        stmt = (
+            stmt.group_by(
+                AlertEvent.location_title,
+                AlertEvent.location_type,
+                AlertEvent.location_oblast,
+            )
+            .order_by(func.count().desc())
+            .limit(limit)
+        )
+        rows = (await session.execute(stmt)).all()
+
+    items = [
+        TopSubRegion(
+            location_title=r.title,
+            location_type=r.ltype,
+            location_oblast=r.oblast,
+            count=r.cnt,
+            duration_minutes=int((r.dur or 0) // 60),
+        )
+        for r in rows
+    ]
+    return TopSubRegionsResponse(period=period, items=items)
 
 
 @router.get("/stats/summary", response_model=SummaryResponse)

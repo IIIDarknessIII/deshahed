@@ -82,6 +82,19 @@ class OblastStat(BaseModel):
     duration_minutes: int
 
 
+class TopSubRegion(BaseModel):
+    location_title: str
+    location_type: LocationType
+    location_oblast: str
+    count: int
+    duration_minutes: int
+
+
+class TopSubRegionsResponse(BaseModel):
+    period: str
+    items: list[TopSubRegion]
+
+
 class SummaryResponse(BaseModel):
     period: str
     total_alerts: int
