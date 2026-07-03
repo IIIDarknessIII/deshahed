@@ -189,14 +189,18 @@ services:
     healthcheck:
       test: ["NONE"]
 
+  # Production web (default). A built standalone image → real ISR cache
+  # headers (s-maxage) and fast cold renders, which matters for crawling the
+  # ~1500 region/hromada landing pages. For local hot-reload editing use the
+  # `web-dev` service below: `docker compose --profile dev up -d web-dev`.
   web:
     build:
       context: ../apps/web
-      dockerfile: Dockerfile.dev
-    image: deshahed-web:dev
+      dockerfile: Dockerfile
+    image: deshahed-web:prod
     container_name: deshahed-web
     environment:
-      NODE_ENV: development
+      NODE_ENV: production
       # Intentionally NOT setting NEXT_PUBLIC_WS_URL here. Next inlines this var into the
       # client bundle, so a single value can't satisfy both `http://localhost:3000` and
       # `https://де-шахед.online`. Let `apps/web/src/lib/env.ts` derive it at runtime
@@ -206,10 +210,6 @@ services:
       SENTRY_DSN: ${SENTRY_DSN:-}
       # Server-to-server base for SSR alert-status fetch (region landing pages).
       INTERNAL_API_BASE: ${INTERNAL_API_BASE:-http://api:8000}
-    volumes:
-      - ../apps/web:/app
-      - web_node_modules:/app/node_modules
-      - web_next_cache:/app/.next
     ports:
       - "${WEB_PORT:-3000}:3000"
     depends_on:
@@ -218,6 +218,34 @@ services:
     networks:
       - internal
     restart: unless-stopped
+
+  # Hot-reload development server (opt-in). Mounts the source and runs
+  # `next dev`. Kept off the default set so production serves the built image.
+  web-dev:
+    build:
+      context: ../apps/web
+      dockerfile: Dockerfile.dev
+    image: deshahed-web:dev
+    container_name: deshahed-web-dev
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-}
+      NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      INTERNAL_API_BASE: ${INTERNAL_API_BASE:-http://api:8000}
+    volumes:
+      - ../apps/web:/app
+      - web_node_modules:/app/node_modules
+      - web_next_cache:/app/.next
+    ports:
+      - "${WEB_DEV_PORT:-3001}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - internal
+    restart: unless-stopped
+    profiles: ["dev"]
 
 volumes:
   db_data:
